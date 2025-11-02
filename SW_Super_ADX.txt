@@ -1,0 +1,183 @@
+input
+  periodoADX(8);
+  periodoMediaADX(3);
+  periodo(100);
+  Histograma(100);
+  Media_Curta(3);
+  Media_Longa(12);
+var
+  // Variáveis
+  fAdx,fAdx14,fDip,fDim,fDip14,fDim14         : float;
+  fMediaAdx8,fMediaAdx14                              : float;
+  cruzamentoDipDimUp,cruzamentoDipDimDown     : boolean;
+  cruzamentoDipDimUp14,cruzamentoDipDimDown14 : boolean;
+  jaPlotadoUp,jaPlotadoDown                   : boolean;
+  fTrix,fMediaTrix,fStoch,fMediaStoch         : float;
+  bTrixComprado,bTrixVendido                  : boolean;
+  bAdxTendency,bAdxDown                       : boolean;
+begin
+  //---------------------------------------------------------//
+  // Código 1: Cálculo de ADX, DMI, Trix e Estocástico
+  //---------------------------------------------------------//
+  // Cálculo dos indicadores ADX e DMI
+  fDip := DiPDiM(8)|0|;
+  fDim := DiPDiM(8)|1|;
+  fDip14 := DiPDiM(12)|0|;
+  fDim14 := DiPDiM(12)|1|;
+  fAdx := ADX(8,8);
+  fAdx14 := ADX(8,8);
+  fMediaAdx8 := Media(periodoMediaADX,fAdx);  // Verifica tendência do ADX
+  fMediaAdx14:= Media(14,fadx14);
+  
+  bAdxTendency := fAdx > fMediaAdx8;  // Cruzamentos de DMI curto
+   //---------------------------------------------------------//
+  cruzamentoDipDimUp := (fDip > fDim) and (fDip[1] <= fDim[1]);
+  cruzamentoDipDimDown := (fDip < fDim) and (fDip[1] >= fDim[1]);  // Cruzamentos de DMI longo
+  cruzamentoDipDimUp14 := (fDip14 > fDim14) and (fDip14[1] <= fDim14[1]);
+  cruzamentoDipDimDown14 := (fDip14 < fDim14) and (fDip14[1] >= fDim14[1]);
+  // Cálculos de Trix e Estocástico
+  fTrix := Trix(7,1);
+  fMediaTrix := Media(3,fTrix);
+  bTrixComprado := fTrix > fMediaTrix;
+  bTrixVendido := fTrix < fMediaTrix;
+  //---------------------------------------------------------//
+  // Pintura de Candles
+  //---------------------------------------------------------//
+  // Resetar flags caso ambos cruzem no mesmo candle
+  if bTrixComprado and cruzamentoDipDimUp and not(fadx < fDim) and not (fAdx < fDip) then
+    begin
+      paintbar(rgb(0,255,0));      // Cruzamento simultâneo para cima
+      jaPlotadoUp := false;      // Reseta o flag
+    end
+  else if bTrixVendido and cruzamentoDipDimDown and not(fadx < fDim) and not (fAdx < fDip) then
+    begin
+      PaintBar(rgb(255,0,0));      // Cruzamento simultâneo para baixo
+      jaPlotadoDown := false;      // Reseta o flag
+    end;
+     //---------------------------------------------------------//
+  // Marcar quando o longo cruza após o curto já ter cruzado
+  if cruzamentoDipDimUp then
+    jaPlotadoUp := true;  // Flag de cruzamento curto para cima
+  if cruzamentoDipDimDown then
+    jaPlotadoDown := true;  // Flag de cruzamento curto para baixo
+     //---------------------------------------------------------//
+  if bTrixComprado and cruzamentoDipDimUp14 and jaPlotadoUp and (not(fadx14 < fDim14) and not (fAdx14 < fDip14)) then
+    begin
+      PaintBar(rgb(0,255,255));      // Longo cruza após o curto para cima
+      jaPlotadoUp := false;      // Reseta o flag
+    end;
+  if bTrixVendido and cruzamentoDipDimDown14 and jaPlotadoDown and (not(fadx14 < fDim14) and not (fAdx14 < fDip14) )then
+    begin
+      PaintBar(rgb(128,0,0));      // Longo cruza após o curto para baixo
+      jaPlotadoDown := false;      // Reseta o flag
+    end;
+end;
+{input
+periodoADX(8);
+periodoMediaADX(3);
+periodo(100);
+Histograma(100);
+Media_Curta(3);
+Media_Longa(12);
+var
+// Código 1 - ADX, DMI, Trix e Estocástico
+fAdx,fDip,fDim                          : float;
+MediaAdx,fStop                          : float;
+cruzamentoDipDimUp,cruzamentoDipDimDown : boolean;
+jaPlotadoUp,jaPlotadoDown               : boolean;
+fTrix,fMediaTrix,fStoch,fMediaStoch     : float;
+bTrixComprado,bTrixVendido              : boolean;
+// Código 2 - SW Media Rufus Verdi
+histogram_v3,histogram_MmeTripla        : float;
+MME_TRIPLA,MME_DUPLA,MME_SINGLE         : float;
+bAdxTendency,bAdxDown                   : boolean;
+bTendencyBear,bTendencyBull             : boolean;
+fMediaSinal,fMediaEntrada,fMediaAdx     : float;
+bFirstSignalBull,bFirstSignalBear       : boolean;
+begin
+//---------------------------------------------------------//
+// Código 1: Cálculo de ADX, DMI, Trix e Estocástico com Pintura de Candles
+//---------------------------------------------------------//
+// Cálculo dos indicadores ADX e DMI
+fDip := DiPDiM(periodoADX)|0|;
+fDim := DiPDiM(periodoADX)|1|;
+fAdx := ADX(periodoADX,periodoADX);
+MediaAdx := Media(periodoMediaADX,fAdx);
+// Verifica tendência do ADX
+bAdxTendency := fAdx > MediaAdx;
+// Cruzamentos de DMI
+cruzamentoDipDimUp := (fDip > fDim) and (fDip[1] <= fDim[1]);
+cruzamentoDipDimDown := (fDip < fDim) and (fDip[1] >= fDim[1]);
+// Cálculos de Trix e Estocástico
+fTrix := Trix(7,1);
+fMediaTrix := Media(3,fTrix);
+bTrixComprado := fTrix > fMediaTrix;
+bTrixVendido := fTrix < fMediaTrix;
+//---------------------------------------------------------//
+// Código 2: Estratégia SW Media Rufus Verdi
+//---------------------------------------------------------//
+// Cálculo das médias MME_SINGLE, MME_DUPLA, e MME_TRIPLA
+MME_SINGLE := MediaExp(periodo,close);
+MME_DUPLA := (2 * MME_SINGLE) - MediaExp(periodo,close);
+MME_TRIPLA := 3 * (MME_SINGLE - MediaExp(periodo,MME_SINGLE)) + MediaExp(periodo,MediaExp(periodo,MME_SINGLE));
+// Verifica tendências do MME_TRIPLA
+bTendencyBear := MME_TRIPLA < MME_TRIPLA[1];
+bTendencyBull := MME_TRIPLA > MME_TRIPLA[1];
+if (currentbar > periodo) then
+begin
+histogram_MmeTripla := 3 * (MME_SINGLE - MediaExp(histograma,MME_SINGLE)) + MediaExp(histograma,MediaExp(periodo,MME_SINGLE));
+// Evitar divisão por zero
+if histogram_MmeTripla[1] <> 0 then
+histogram_v3 := (((histogram_MmeTripla / histogram_MmeTripla[1]) - 1) * 100) * 100
+else
+histogram_v3 := 0;
+end;
+fMediaSinal := WAverage(histogram_v3,Media_Curta);
+fMediaEntrada := MediaExp(Media_Longa,histogram_v3);
+//---------------------------------------------------------//
+// Pintura de Candles
+//---------------------------------------------------------//
+// Lógica do Código 1
+if not (fAdx < fDip) and not (fAdx < fDim) then
+begin
+if bTrixComprado and cruzamentoDipDimUp and not jaPlotadoUp then
+begin
+PaintBar(rgb(0,255,0));
+jaPlotadoUp := true;
+jaPlotadoDown := false;
+PlotText("Alerta",rgb(0,255,0),0,14);
+end
+else if bTrixVendido and cruzamentoDipDimDown and not jaPlotadoDown then
+begin
+PaintBar(clRed);
+jaPlotadoDown := true;
+jaPlotadoUp := false;
+PlotText("Alerta",rgb(255,0,0),2,14);
+end;
+// Lógica do Código 2 - Rufus Verdi
+{  if bAdxTendency then
+begin
+if (histogram_v3 > 0) and (fMediaSinal > fMediaEntrada) and bTendencyBull and not bFirstSignalBull then
+begin
+PaintBar(rgb(0,255,0));
+bFirstSignalBull := true;
+bFirstSignalBear := false;
+end
+else if (histogram_v3 < 0) and (fMediaSinal < fMediaEntrada) and bTendencyBear and not bFirstSignalBear then
+begin
+bFirstSignalBear := true;
+bFirstSignalBull := false;
+PaintBar(rgb(255,0,0));
+end;
+end;
+end;
+//---------------------------------------------------------//
+// Plotagem de MME_TRIPLA
+//---------------------------------------------------------//
+plot(MME_TRIPLA);
+if bTendencyBull then
+SetPlotColor(1,rgb(0,128,0))
+else if bTendencyBear then
+SetPlotColor(1,rgb(255,0,0));
+end;
+}

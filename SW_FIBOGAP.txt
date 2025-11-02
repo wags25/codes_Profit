@@ -1,0 +1,77 @@
+var
+  TIME_BAR_OPEN,TIME_BAR_CLOSE                        : BOOLEAN;
+  maxmc,minmc,maxmo,minmO                             : float;
+  iDivisor,iPeriodo,i                                 : integer;
+  FIBO23,FIBO76,FIBO111,FIBO127,FIBO141,FIBO161       : FLOAT;
+  FIBO23H,FIBO76H,FIBO111H,FIBO127H,FIBO141H,FIBO161H : FLOAT;
+  percentGap                                          : float;
+begin
+  TIME_BAR_OPEN := (Time >= 0900) and (Time < 0915);
+  TIME_BAR_CLOSE := (Time >= 1815) and (Time < 1830);
+  //======================================================================================================================================//
+  iPeriodo := BarDuration;
+  if TIME_BAR_OPEN = True then
+    begin
+      iDivisor := ((Time - 0900) / iPeriodo) + 1;
+      maxmO := high;
+      minmO := low;
+      for i := 1 to iDivisor - 1 do
+        begin
+          if High[i] > maxmO then
+            maxmO := High[i];
+          if Low[i] < minmO then
+            minmO := Low[i];
+        end;
+    end;
+  //======================================================================================================================================//
+  if TIME_BAR_CLOSE = True then
+    begin
+      iDivisor := ((Time - 1800) / iPeriodo) + 1;
+      maxmC := high;
+      minmC := low;
+      for i := 1 to iDivisor - 1 do
+        begin
+          if High[i] > maxmc then
+            maxmc := High[i];
+          if Low[i] < minmc then
+            minmc := Low[i];
+        end;
+    end;
+  percentGap := ((opend(0) / CLOSEd(1)) - 1) * 100;
+  //======================================================================================================================================//
+  if (opend(0) < CLOSEd(1)) and (percentGap < - 0.10) then
+    begin
+      FIBO23 := MAXMC - ((MAXMC - MINMO) * (23.6 / 100));
+      FIBO76 := MAXMC - ((MAXMC - MINMO) * (76.4 / 100));
+      FIBO111 := MAXMC - ((MAXMC - MINMO) * (111.8 / 100));
+      FIBO127 := MAXMC - ((MAXMC - MINMO) * (127.0 / 100));
+      FIBO141 := MAXMC - ((MAXMC - MINMO) * (141.2 / 100));
+      FIBO161 := MAXMC - ((MAXMC - MINMO) * (161.8 / 100));
+      //======================================================================================================================================//
+      // plot(minmO);
+      //PLOT2(MAXMC);
+      PLOT(FIBO23);
+      PLOT2(FIBO76);
+      PLOT3(FIBO111);
+      PLOT4(FIBO127);
+      PLOT5(FIBO141);
+      PLOT6(FIBO161);
+    end;
+  //======================================================================================================================================//
+  if (opend(0) > CLOSEd(1)) and (percentGap > 0.10) then
+    begin
+      FIBO23H := MINMC + ((MAXMO - MINMC) * (23.6 / 100));
+      FIBO76H := MINMC + ((MAXMO - MINMC) * (76.4 / 100));
+      FIBO111H := MINMC + ((MAXMO - MINMC) * (111.8 / 100));
+      FIBO127h := MINMC + ((MAXMO - MINMC) * (127.0 / 100));
+      FIBO141h := MINMC + ((MAXMO - MINMC) * (141.2 / 100));
+      FIBO161h := MINMC + ((MAXMO - MINMC) * (161.8 / 100));
+      //======================================================================================================================================//
+      PLOT(FIBO23h);
+      PLOT2(FIBO76h);
+      PLOT3(FIBO111h);
+      PLOT4(FIBO127h);
+      PLOT5(FIBO141h);
+      PLOT6(FIBO161h);
+    end;
+end;

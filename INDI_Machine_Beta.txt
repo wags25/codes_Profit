@@ -1,0 +1,1582 @@
+// *************************************************************
+// *************************************************************
+// ****************** RASTREADOR DE TENDêNCIA ******************
+// ********************* VERSAO 0.44 BETA **********************
+// *************************************************************
+// *************************************************************
+CONST
+  DAYTRADE                 = TRUE;
+  HORASAIDA                = 1650;
+  HORAFECHAMENTO           = 1710;
+  CPF_INVALIDO             = 0;
+  CPF_NAO_TESTADO          = 1;
+  CPF_OK                   = 2;
+  DIAS_AVISO_VENCIMENTO    = 1;
+  //=====================================//
+  VencimentoDia            = 16;
+  VencimentoMes            = 03;
+  VencimentoAno            = 2024;
+  //=====================================//
+  pProximidadeToqueTick    = 1;
+  RangeVezesRM21Percent    = 3;
+  //FiltroMelhoramento    = false;
+  MelhoramentoPeriodo      = 8;
+  MelhoramentoPeriodoMedia = 8;
+  MelhoramentoEntradaValor = 25.0;
+  MelhoramentoSaidaValor   = 18.0;
+  CPF                      = 3;
+  //=====================================//
+INPUT
+  //=====================================//
+  AutoPiloto(TRUE);
+  Tendencia(TRUE);
+  Lateral(TRUE);
+  UltraAgressivo(TRUE);
+  MaxOperUltraTendencia(2);
+  MaxOperUltraLateral(2);
+  Agressivo(TRUE);
+  MaxOperAgressivoTendencia(2);
+  MaxOperAgressivoLateral(2);
+  Moderado(TRUE);
+  MaxOperModeradoTendencia(2);
+  MaxOperModeradoLateral(2);
+  Porcento50(TRUE);
+  MaxOperPorcento50(1);
+  MaxOperacoesLateral(2);
+  MaxOperacoesTendencia(3);
+  Simetria(TRUE);
+  FiltroMelhoramento(TRUE);
+  ContraEstrategia(false);
+  HoraInicioApregoacao(9);
+  MinutoInicioApregoacao(2);
+  //=====================================//
+  PrimeRompimentoReal(true);
+  PorcentRompimentoReal(10.0);
+  PorcentQuebraTendencia(10.0);
+  //=====================================//
+  ModuloAutomacao(TRUE);
+  Range21Dias(FALSE);
+  GainTendencia(1000.0);
+  StopLossTendencia(150.0);
+  GainLateral(1000.0);
+  StopLossLateral(100.0);
+  StopOffset(100.0);
+  OffsetEntradaStop(20.0);
+  AutoBreakeven(true);
+  BreakevenTrigger(200.0);
+  BreakevenDistEntrada(25);
+  TrailingStop(true);
+  TraillingStopTrigger(400.0);
+  DistPrecoPontosTrigger(100.0);
+  DistUltPrecoTrailing(100.0);
+  FrequenciaAjuste(50.0);
+  //=====================================//
+  DefesaAgressiva(TRUE);
+  DefesaAgressivaPontos(100);
+  DefAgressivaGatilho1(500);
+  DefAgressivaGatilho2(700);
+  DefAgressivaGatilho3(800);
+  //=====================================//
+  PlotarIndicador(false);
+  DiasPlotagem(0);
+  OperarReplay(false);
+  DiaReplay(1);
+  MesReplay(1);
+  AnoReplay(2020);
+  {// ************************************************** //
+  // SOMENTE TESTES - NÃO LIBERAR PARA USUÁRIO FINAL    //
+  // ************************************************** //
+  MelhoramentoPeriodo(8);
+  MelhoramentoPeriodoMedia(8);
+  MelhoramentoEntradaValor(25);
+  MelhoramentoSaidaValor(18);}
+  //=====================================//
+Var
+  b_TendenciaAlta,b_TendenciaAltaForte,b_TendenciaAltaFortissima                     : boolean;
+  b_TendenciaBaixa,b_TendenciaBaixaForte,b_TendenciaBaixaFOrtissima                  : boolean;
+  b_Tendencia50Alta,b_Tendencia50Baixa                                               : boolean;
+  TrailingStopAtivado                                                                : boolean;
+  BreakevenAtivado                                                                   : boolean;
+  bTipoTendenciaAlta                                                                 : boolean;
+  bTipoTendenciaBaixa                                                                : boolean;
+  //bControleEntrarOperacao                                                            : boolean;
+  bJaContouOperacao                                                                  : boolean;
+  bEntradaBranca,bEntradaFucsia,bEntradaVerde,bEntrada50                             : boolean;
+  ////======================================================================================================================================//
+  bEntradaBrancaHabilitadaLat,bEntradaFucsiaHabilitadaLat,bEntradaVerdeHabilitadaLat : boolean;
+  bComprasHabilitadasLat,bVendasHabilitadasLat                                       : boolean;
+  iDirecaoMercadoLat                                                                 : integer;
+  fRangeHabilitacaoLat                                                               : float;
+  ////======================================================================================================================================//
+  RT_70,RT_80,RT_90,RT_10,RT_20,RT_30,RT_50                                          : FLOAT;
+  Stop_Loss,fEntrada,fGain,R                                                         : FLOAT;
+  fControleEntrada                                                                   : float;
+  fProximidadeToqueTick                                                              : float;
+  fMaximaDiaria,fMinimaDiaria                                                        : float;
+  fPrecoStopOffset,FloorTraillingStop                                                : float;
+  RM                                                                                 : FLOAT;
+  fRM21_10Percent,fRM21_5Percent                                                     : float;
+  fStopEmPontos                                                                      : float;
+  fAlvoEmPontosTend                                                                  : float;
+  fStopEmPontosTend                                                                  : float;
+  fAlvoEmPontosLat                                                                   : float;
+  fStopEmPontosLat                                                                   : float;
+  fUltimaApregoacao                                                                  : float;
+  fRompimentoReal                                                                    : float;
+  fPontosQuebraTendencia                                                             : float;
+  ////======================================================================================================================================//
+  iDataAtual                                                                         : integer;
+  iToqueAltaFortissima                                                               : integer;
+  iToqueAltaForte                                                                    : integer;
+  iToqueAlta                                                                         : integer;
+  iToque50Alta                                                                       : integer;
+  iToque50Baixa                                                                      : integer;
+  iToqueBaixaFortissima                                                              : integer;
+  iToqueBaixaForte                                                                   : integer;
+  iToqueBaixa                                                                        : integer;
+  nIndex,Periodo                                                                     : Integer;
+  iNroCandlesOrdem,iEntradaStop                                                      : integer;
+  iBarControleStop                                                                   : integer;
+  iHabilitaExecucaoPorCPF                                                            : integer;
+  Vencimento                                                                         : integer;
+  iHoraEntrada                                                                       : integer;
+  iDataReplay                                                                        : integer;
+  iMaxOperUltraTendencia                                                             : integer;
+  iMaxOperUltraLateral                                                               : integer;
+  iMaxOperAgressivoTendencia                                                         : integer;
+  iMaxOperAgressivoLateral                                                           : integer;
+  iMaxOperModeradoTendencia                                                          : integer;
+  iMaxOperModeradoLateral                                                            : integer;
+  iMaxOperPorcento50                                                                 : integer;
+  iMaxOperacoesTendencia                                                             : integer;
+  iMaxOperacoesLateral                                                               : integer;
+  stringData                                                                         : string;
+  fAdx                                                                               : float;
+  iBarControleToque                                                                  : integer;
+  bOrdensTesteAbertas                                                                : boolean;
+  ////======================================================================================================================================//
+procedure ApregoaSaida(fPrecoStopLoss : float;
+fPrecoGain : float;fOffsetEmPontos : float);
+begin
+  if IsBought then
+    begin
+      IF (LOW < fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              SellToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          SellToCoverLimit(fPrecoGain);
+          SellToCoverStop(fPrecoStopLoss,fPrecoStopLoss - fOffsetEmPontos);
+        end;
+    end;
+  ////======================================================================================================================================//
+  if IsSold then
+    begin
+      if (HIGH > fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              BuyToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          BuyToCoverLimit(fPrecoGain);
+          BuyToCoverStop(fPrecoStopLoss,fPrecoStopLoss + fOffsetEmPontos);
+        end;
+    end;
+end;
+function TestaCPFeVencimento(iCPF : integer;
+iJaHabilitado : integer;iVencimento : integer;bTendencia : boolean;bLateral : boolean;bAutoPiloto : boolean;iHora : integer;iMinuto : integer) : integer;
+const
+  TotalCPF = 1;
+var
+  i,esq,dir,med : integer;
+  bAchouCPF,bHoraOk : boolean;
+  CPFs : Array[1..TotalCPF] of Integer;
+begin
+  if LastBarOnChart then
+    begin
+      if iJaHabilitado = 2 then
+        begin
+          result := iJaHabilitado;
+        end
+      else if iJaHabilitado = 1 then
+        begin
+          if ((bTendencia) AND (bLateral) AND ( not bAutoPiloto)) OR (( not bTendencia) AND ( not bLateral)) then
+            begin
+              result := - 1;
+            end
+          else 
+            begin
+              // **************************************************************************
+              // ***** Preencher aqui a lista de CPFs autorizados a utilizar o robô.
+              // ***** É interessante ter uma uma planilha Excel para gerar essa lista, no formato específico.
+              // **************************************************************************
+              // Lista de CPFs.
+              begin
+                CPFs[1] := 3;
+              end;
+              // **************************************************************************
+              // Verificação de horário de entrada
+              if (iHora < 9) OR (iHora > 17) OR (iMinuto < 0) OR (iMinuto > 59) then
+                bHoraOk := false
+              else 
+                bHoraOk := true;
+              // Busca binária pelo CPF
+              esq := 0;
+              dir := TotalCPF + 1;
+              // Encontrar índice da suposta posição do CPF
+              while (esq < dir - 1) do
+                begin
+                  med := (esq + dir) / 2;
+                  if (CPFs[med] < iCPF) then
+                    esq := med
+                  else 
+                    dir := med;
+                end;
+              i := dir;
+              // Verifica se a posição do vetor realmente contém o CPF procurado.
+              bAchouCPF := (CPFs[i] = iCPF);
+              if bAchouCPF AND (CurrentDate <= iVencimento) AND ((GetAsset() = "WINFUT") OR (GetAsset() = "WINFUT")) AND (GraphicInterval = itVariation) AND (bHoraOk) then
+                result := 2
+              else 
+                result := 0;
+            end;
+        end;
+    end
+  else 
+    begin
+      // Ainda não chegou no último candle para fazer a pesquisa de CPF e demais análises.
+      result := iJaHabilitado;
+    end;
+end;
+////======================================================================================================================================//
+begin
+  // Verificar se é um novo dia.
+  if (Date <> iDataAtual) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      iDataAtual := Date;
+      if (OperarReplay) then
+        begin
+          if (DiaReplay = 99001172) then
+            iDataReplay := DiaReplay
+          else 
+            iDataReplay := ELDate(AnoReplay,MesReplay,DiaReplay);
+        end
+      else 
+        begin
+          iDataReplay := CurrentDate;
+        end;
+      if (iDataReplay <> Date) AND (iDataReplay <> 99001172) then
+        begin
+          plotText("Replay não disponível para essa data. Verifique a data desejada nos parâmetros do robô",clRed,1,9);
+        end
+      else 
+        begin
+          // Colocar ordens e mensagem para indicar que o robô está operando.
+          SellShortLimit(Open + (Open * 0.03));
+          BuyLimit(Open - (Open * 0.03));
+          bOrdensTesteAbertas := true;
+          plotText("Robô ligado!",clAqua,3,9,(High + 5));
+        end;
+      bTipoTendenciaAlta := false;
+      bTipoTendenciaBaixa := false;
+      b_TendenciaAlta := false;
+      b_TendenciaAltaForte := false;
+      b_TendenciaAltaFortissima := false;
+      b_TendenciaBaixa := false;
+      b_TendenciaBaixaForte := false;
+      b_TendenciaBaixaFortissima := false;
+      b_Tendencia50Alta := false;
+      b_Tendencia50Baixa := false;
+      fControleEntrada := 0;
+      FloorTraillingStop := 0;
+      // A indicação dos primeiros toques nas linhas de tendência será controlada pela lógica que identifica o tipo de tendência.
+      //  Já os próximos toques serão acrescentados assim que fizer nova mínima caso o primeiro toque já tenha sido efetuado.
+      iToqueAltaFortissima := 0;
+      iToqueAltaForte := 0;
+      iToqueAlta := 0;
+      iToque50Alta := 0;
+      iToque50Baixa := 0;
+      iToqueBaixaFortissima := 0;
+      iToqueBaixaForte := 0;
+      iToqueBaixa := 0;
+      fMaximaDiaria := Open;
+      fMinimaDiaria := Open;
+      fProximidadeToqueTick := 4;
+      //bControleEntrarOperacao := false;
+      bJaContouOperacao := false;
+      fEntrada := 0;
+      nIndex := 0;
+      R := 0;
+      RM := 0;
+      iMaxOperUltraTendencia := 0;
+      iMaxOperUltraLateral := 0;
+      iMaxOperAgressivoTendencia := 0;
+      iMaxOperAgressivoLateral := 0;
+      iMaxOperModeradoTendencia := 0;
+      iMaxOperModeradoLateral := 0;
+      iMaxOperPorcento50 := 0;
+      iMaxOperacoesTendencia := 0;
+      iMaxOperacoesLateral := 0;
+      Periodo := (21);
+      ///=================================================================================================================================================================================================///
+      //RANGE MEDIO DOS ULTIMOS 21 DIAS
+      for nIndex := 1 to (Periodo) Do
+        begin
+          R := R + (HighD(nIndex) - LowD(nIndex));
+        end;
+      RM := Round2fraction(R / Periodo);
+      // Calculo dos pontos referentes às porcentagens sobre o range medio 21 dias
+      fRM21_10Percent := Round2Fraction((10 / 100) * RM);
+      fRM21_5Percent := Round2Fraction((5 / 100) * RM);
+      fRompimentoReal := Round2Fraction((PorcentRompimentoReal / 100) * RM);
+      fPontosQuebraTendencia := Round2Fraction((PorcentQuebraTendencia / 100) * RM);
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 3;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+      iHabilitaExecucaoPorCPF := CPF_NAO_TESTADO;
+      // iDirecaoMercadoLat irá controlar se o mercado está na mão do comprador ou do vendedor (controlado pelos 50% entre máxima e mínima).
+      // iDirecaoMercadoLat = 1  ==> mercado na mão do comprador
+      // iDirecaoMercadoLat = -1  ==> mercado na mão do vendedor
+      iDirecaoMercadoLat := 0;
+      // Zerar variáveis para controle de entrada na "tendência" lateral.
+      bEntradaBrancaHabilitadaLat := false;
+      bEntradaFucsiaHabilitadaLat := false;
+      bEntradaVerdeHabilitadaLat := false;
+      fRangeHabilitacaoLat := 2;
+      // Resetar variáveis auxiliares de habilitação de compras e vendas.
+      bComprasHabilitadasLat := false;
+      bVendasHabilitadasLat := false;
+      // Calcular alvo e stop loss em pontos para mercado de tendencia.
+      if (StopLossTendencia = 0) then
+        begin
+          // Stop de 10% range medio 21 dias
+          fStopEmPontosTend := fRM21_10Percent;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Stop da porcentagem calculada sobre o range medio 21 dias
+            fStopEmPontosTend := Round2Fraction((StopLossTendencia / 100) * RM)
+          else 
+            fStopEmPontosTend := StopLossTendencia;
+        end;
+      if (GainTendencia = 0) then
+        begin
+          // Valor que dificilmente será atingido no dia. Na prática vai sair no trailing stop.
+          fAlvoEmPontosTend := 500;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Valor será calculado sobre o valor em pontos do stop loss (assimetria risco/retorno).
+            fAlvoEmPontosTend := GainTendencia * fStopEmPontosTend
+          else 
+            fAlvoEmPontosTend := GainTendencia;
+        end;
+      // Calcular alvo e stop loss em pontos para mercado lateral.
+      if (StopLossLateral = 0) then
+        begin
+          // Stop de 10% range medio 21 dias
+          fStopEmPontosLat := fRM21_10Percent;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Stop da porcentagem calculada sobre o range medio 21 dias
+            fStopEmPontosLat := Round2Fraction((StopLossLateral / 100) * RM)
+          else 
+            fStopEmPontosLat := StopLossLateral;
+        end;
+      if (GainLateral = 0) then
+        begin
+          // Valor que dificilmente será atingido no dia. Na prática vai sair no trailing stop.
+          fAlvoEmPontosLat := 500;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Valor será calculado sobre o valor em pontos do stop loss (assimetria risco/retorno).
+            fAlvoEmPontosLat := GainLateral * fStopEmPontosLat
+          else 
+            fAlvoEmPontosLat := GainLateral;
+        end;
+      ////======================================================================================================================================//
+      // Calcular data de vencimento do robô em Easy Language.
+      Vencimento := ELDate(VencimentoAno,VencimentoMes,VencimentoDia);
+      if (CurrentDate > (Vencimento - DIAS_AVISO_VENCIMENTO)) then
+        begin
+          if (VencimentoDia < 10) then
+            stringData := "0" + VencimentoDia
+          else 
+            stringData := VencimentoDia;
+          if (VencimentoMes < 10) then
+            stringData := stringData + "/0" + VencimentoMes
+          else 
+            stringData := stringData + "/" + VencimentoMes;
+          stringData := stringData + "/" + VencimentoAno;
+          plotText("Robô operacional. Data de expiração do robô: " + stringData,clTeal,2,9);
+        end;
+      // Calcular horário de início de apregoamento de ordens.
+      if iHoraEntrada = 0 then
+        begin
+          if (HoraInicioApregoacao < 9) OR (HoraInicioApregoacao > 17) OR (MinutoInicioApregoacao < 0) OR (MinutoInicioApregoacao > 59) then
+            begin
+              iHoraEntrada := 2359;
+            end
+          else 
+            begin
+              iHoraEntrada := (HoraInicioApregoacao * 100) + MinutoInicioApregoacao;
+            end;
+        end;
+    end
+  else 
+    begin
+      if (bOrdensTesteAbertas) then
+        begin
+          CancelPendingOrders;
+          bOrdensTesteAbertas := false;
+        end;
+    end;
+  ////======================================================================================================================================//
+  iHabilitaExecucaoPorCPF := TestaCPFeVencimento(CPF,iHabilitaExecucaoPorCPF,Vencimento,Tendencia,Lateral,AutoPiloto,HoraInicioApregoacao,MinutoInicioApregoacao);
+  if iHabilitaExecucaoPorCPF > CPF_INVALIDO then
+    begin
+      // Verificar se existe nova máxima.
+      fMaximaDiaria := Highd(0);
+      if (fMaximaDiaria > fMaximaDiaria[1]) then
+        begin
+          // Controlar também se a tendência contrária está habilitada para evitar erros quando a tendência inverteu pela nova máxima mas ainda não quebrou a tendência de baixa pelo fRompimentoReal.
+          if (fControleEntrada = 0) then
+            begin
+              fControleEntrada := fMaximaDiaria[1];
+            end;
+          if (not PrimeRompimentoReal) OR ((Highd(0) - fControleEntrada) >= fRompimentoReal) then
+            begin
+              // Como rompeu a máxima pode estar abrindo tendência de alta. Dessa forma, desabilitamos as entradas para mercado lateral.
+              bEntradaVerdeHabilitadaLat := false;
+              bEntradaFucsiaHabilitadaLat := false;
+              bEntradaBrancaHabilitadaLat := false;
+              bVendasHabilitadasLat := false;
+              bTipoTendenciaAlta := true;
+              b_TendenciaAlta := true;
+              b_TendenciaAltaForte := true;
+              b_TendenciaAltaFortissima := true;
+              b_Tendencia50Alta := true;
+              bTipoTendenciaBaixa := false;
+              b_TendenciaBaixa := false;
+              b_TendenciaBaixaForte := false;
+              b_TendenciaBaixaFortissima := false;
+              b_Tendencia50Baixa := false;
+              // Zerar todos os toques de baixa
+              iToqueBaixaFortissima := 0;
+              iToqueBaixaForte := 0;
+              iToqueBaixa := 0;
+              iToque50Baixa := 0;
+              // Zerar o controle de nao repetir as entradas pq fez nova máxima, consequentemente os valores serão diferentes.
+              bEntradaBranca := false;
+              bEntradaFucsia := false;
+              bEntradaVerde := false;
+              bEntrada50 := false;
+              if (iToqueAltaFortissima > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueAltaFortissima := iToqueAltaFortissima + 1;
+                end;
+              if (iToqueAltaForte > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueAltaForte := iToqueAltaForte + 1;
+                end;
+              if (iToqueAlta > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueAlta := iToqueAlta + 1;
+                end;
+              if (iToque50Alta > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToque50Alta := iToque50Alta + 1;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+      // Verificar se existe nova mínima.
+      fMinimaDiaria := Lowd(0);
+      if (fMinimaDiaria < fMinimaDiaria[1]) then
+        begin
+          // Controlar também se a tendência contrária está habilitada para evitar erros quando a tendência inverteu pela nova mínima mas ainda não quebrou a tendência de alta pelo fRompimentoReal.
+          if (fControleEntrada = 0) then
+            begin
+              fControleEntrada := fMinimaDiaria[1];
+            end;
+          if (not PrimeRompimentoReal) OR ((fControleEntrada - Lowd(0)) >= fRompimentoReal) then
+            begin
+              // Como rompeu a mínima pode estar abrindo tendência de baixa. Dessa forma, desabilitamos as entradas para mercado lateral.
+              bEntradaVerdeHabilitadaLat := false;
+              bEntradaFucsiaHabilitadaLat := false;
+              bEntradaBrancaHabilitadaLat := false;
+              bComprasHabilitadasLat := false;
+              bTipoTendenciaBaixa := true;
+              b_TendenciaBaixa := true;
+              b_TendenciaBaixaForte := true;
+              b_TendenciaBaixaFortissima := true;
+              b_Tendencia50Baixa := true;
+              bTipoTendenciaAlta := false;
+              b_TendenciaAlta := false;
+              b_TendenciaAltaForte := false;
+              b_TendenciaAltaFortissima := false;
+              b_Tendencia50Alta := false;
+              // Zerar todos os toques de alta
+              iToqueAltaFortissima := 0;
+              iToqueAltaForte := 0;
+              iToqueAlta := 0;
+              iToque50Alta := 0;
+              // Zerar o controle de nao repetir as entradas pq fez nova mínima, consequentemente os valores serão diferentes.
+              bEntradaBranca := false;
+              bEntradaFucsia := false;
+              bEntradaVerde := false;
+              bEntrada50 := false;
+              if (iToqueBaixaFortissima > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueBaixaFortissima := iToqueBaixaFortissima + 1;
+                end;
+              if (iToqueBaixaForte > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueBaixaForte := iToqueBaixaForte + 1;
+                end;
+              if (iToqueBaixa > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToqueBaixa := iToqueBaixa + 1;
+                end;
+              if (iToque50Baixa > 0) AND (CurrentBar <> iBarControleToque) then
+                begin
+                  iToque50Baixa := iToque50Baixa + 1;
+                end;
+            end;
+        end;
+      ///=================================================================================================================================================================================================///
+      RT_70 := ((Round2Fraction((LowD(0) - HighD(0)) * (70 / 100))) + (HighD(0)));
+      RT_80 := ((Round2Fraction((LowD(0) - HighD(0)) * (80 / 100))) + (HighD(0)));
+      RT_90 := ((Round2Fraction((LowD(0) - HighD(0)) * (90 / 100))) + (HighD(0)));
+      RT_50 := ((Round2Fraction((LowD(0) - HighD(0)) * (50 / 100))) + (HighD(0)));
+      RT_30 := ((Round2Fraction((LowD(0) - HighD(0)) * (30 / 100))) + (HighD(0)));
+      RT_20 := ((Round2Fraction((LowD(0) - HighD(0)) * (20 / 100))) + (HighD(0)));
+      RT_10 := ((Round2Fraction((LowD(0) - HighD(0)) * (10 / 100))) + (HighD(0)));
+      ///=================================================================================================================================================================================================///
+      ///                                                         PARTE RESPONSÁVEL POR IDENTIFICAR TENDÊNCIA                                                                                                                                                    ///
+      ///=================================================================================================================================================================================================///
+      if (CurrentDate <= Vencimento) {AND ((Date = iDataReplay) OR (iDataReplay = 99001172))} AND ((Highd(0) - Lowd(0)) > fRM21_10Percent) then
+        begin
+          if (Close >= RT_50) then
+            begin
+              iDirecaoMercadoLat := 1;
+              // Verificar se passou dos 50% pelo menos metade do fRM21_10Percent para setar variável auxiliar de habilitação de compras para quando o mercado estiver na mão do vendedor.
+              if (High > (RT_50 + (fRM21_10Percent / 2))) then
+                bComprasHabilitadasLat := true;
+            end
+          else 
+            begin
+              iDirecaoMercadoLat := - 1;
+              // Verificar se passou dos 50% pelo menos metade do fRM21_10Percent para setar variável auxiliar de habilitação de vendas para quando o mercado estiver na mão do comprador.
+              if (Low < (RT_50 - (fRM21_10Percent / 2))) then
+                bVendasHabilitadasLat := true;
+            end;
+          if (bTipoTendenciaAlta) then
+            begin
+              //Identificando tipo da tendência de alta
+              // Continua em tendencia fortíssima se o low está acima da linha de tendencia menos o fRM21_10Percent e acima da linha dos 20%
+              if (b_TendenciaAltaFortissima) AND (low >= (RT_10 - fRM21_10Percent)) AND (low > RT_20) then
+                begin
+                  b_TendenciaAltaFortissima := true;
+                  // Para garantir que tocou a linha de tendência, RT_10 precisa estar entre High e Low.
+                  if (iToqueAltaFortissima = 0) AND (RT_10 >= Low) AND (RT_10 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 10%
+                      iToqueAltaFortissima := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              // Continua em tendencia forte se o low está acima da linha de tendencia menos o fRM21_10Percent e acima da linha dos 30%
+              else if (b_TendenciaAltaForte) AND (low >= (RT_20 - fRM21_10Percent)) AND (low > RT_30) then
+                begin
+                  b_TendenciaAltaForte := true;
+                  b_TendenciaAltaFortissima := false;
+                  // Como perdeu a tendência fortíssima, reseta primeiro toque dos 90%.
+                  iToqueAltaFortissima := 0;
+                  // Para garantir que tocou a linha de tendência, RT_20 precisa estar entre High e Low.
+                  if (iToqueAltaForte = 0) AND (RT_20 >= Low) AND (RT_20 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 80%
+                      iToqueAltaForte := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              // Continua em tendencia se o low está acima da linha de tendencia menos o fPontosQuebraTendencia, e não tocou os 70%.
+              else if (b_TendenciaAlta) AND (low >= (RT_30 - fPontosQuebraTendencia)) AND (low > RT_70) then
+                begin
+                  b_TendenciaAlta := true;
+                  b_TendenciaAltaForte := false;
+                  b_TendenciaAltaFortissima := false;
+                  // Como perdeu a tendência forte, reseta primeiro toque dos 80% e 90%.
+                  iToqueAltaForte := 0;
+                  iToqueAltaFortissima := 0;
+                  // Para garantir que tocou a linha de tendência, RT_30 precisa estar entre High e Low.
+                  if (iToqueAlta = 0) AND (RT_30 >= Low) AND (RT_30 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 30% (para os casos em que o toque nos 50% resetou o contador de toque da alta mesmo sem ter quebrado a tendência, esse racional acaba corrigindo esse fato)
+                      iToqueAlta := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              else 
+                begin
+                  // Perdeu tendência, resetar as variáveis.
+                  bTipoTendenciaAlta := false;
+                  b_TendenciaAlta := false;
+                  b_TendenciaAltaForte := false;
+                  b_TendenciaAltaFortissima := false;
+                  iToqueAltaFortissima := 0;
+                  iToqueAltaForte := 0;
+                  iToqueAlta := 0;
+                  fControleEntrada := 0;
+                  iEntradaStop := 0;
+                  fEntrada := 0;
+                  // Habilitar entradas para o mercado lateral
+                  if (UltraAgressivo) then
+                    bEntradaBrancaHabilitadaLat := true;
+                  if (Agressivo) then
+                    bEntradaFucsiaHabilitadaLat := true;
+                  if (Moderado) then
+                    bEntradaVerdeHabilitadaLat := true;
+                end;
+            end
+          ////======================================================================================================================================//
+          else if (bTipoTendenciaBaixa) then
+            begin
+              //Identificando tipo da tendência de baixa
+              // Continua em tendencia fortíssima se o high está abaixo da linha de tendencia mais o fRM21_10Percent e abaixo da linha dos 80%
+              if (b_TendenciaBaixaFortissima) AND (high <= (RT_90 + fRM21_10Percent)) AND (high < RT_80) then
+                begin
+                  b_TendenciaBaixaFortissima := true;
+                  // Para garantir que tocou a linha de tendência, RT_90 precisa estar entre High e Low.
+                  if (iToqueBaixaFortissima = 0) AND (RT_90 >= Low) AND (RT_90 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 90%
+                      iToqueBaixaFortissima := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              // Continua em tendencia forte se o high está abaixo da linha de tendencia mais o fRM21_10Percent e abaixo da linha dos 70%
+              else if (b_TendenciaBaixaForte) AND (high <= (RT_80 + fRM21_10Percent)) AND (high < RT_70) then
+                begin
+                  b_TendenciaBaixaForte := true;
+                  b_TendenciaBaixaFortissima := false;
+                  // Como perdeu a tendência fortíssima, reseta primeiro toque dos 90%.
+                  iToqueBaixaFortissima := 0;
+                  // Para garantir que tocou a linha de tendência, RT_80 precisa estar entre High e Low.
+                  if (iToqueBaixaForte = 0) AND (RT_80 >= Low) AND (RT_80 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 80%
+                      iToqueBaixaForte := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              // Continua em tendencia se o high está abaixo da linha de tendencia mais o fPontosQuebraTendencia, e não tocou a linha dos 30%.
+              else if (b_TendenciaBaixa) AND (high <= (RT_70 + fPontosQuebraTendencia)) AND (high < RT_30) then
+                begin
+                  b_TendenciaBaixa := true;
+                  b_TendenciaBaixaForte := false;
+                  b_TendenciaBaixaFortissima := false;
+                  // Como perdeu a tendência forte, reseta primeiro toque dos 80% e 90%.
+                  iToqueBaixaForte := 0;
+                  iToqueBaixaFortissima := 0;
+                  // Para garantir que tocou a linha de tendência, RT_70 precisa estar entre High e Low.
+                  if (iToqueBaixa = 0) AND (RT_70 >= Low) AND (RT_70 <= High) then
+                    begin
+                      // Eh o primeiro toque nos 70% (para os casos em que o toque nos 50% resetou o contador de toque da baixa mesmo sem ter quebrado a tendência, esse racional acaba corrigindo esse fato)
+                      iToqueBaixa := 1;
+                      // Invalida qualquer valor de entrada anterior.
+                      fEntrada := 0;
+                      // Guardar o candle onde fez o 1o toque.
+                      iBarControleToque := CurrentBar;
+                    end;
+                end
+              ////======================================================================================================================================//
+              else 
+                begin
+                  // Perdeu tendência, resetar as variáveis.
+                  bTipoTendenciaBaixa := false;
+                  b_TendenciaBaixa := false;
+                  b_TendenciaBaixaForte := false;
+                  b_TendenciaBaixaFortissima := false;
+                  iToqueBaixaFortissima := 0;
+                  iToqueBaixaForte := 0;
+                  iToqueBaixa := 0;
+                  fControleEntrada := 0;
+                  iEntradaStop := 0;
+                  fEntrada := 0;
+                  if (UltraAgressivo) then
+                    bEntradaBrancaHabilitadaLat := true;
+                  if (Agressivo) then
+                    bEntradaFucsiaHabilitadaLat := true;
+                  if (Moderado) then
+                    bEntradaVerdeHabilitadaLat := true;
+                end;
+            end
+          else 
+            // Não tem tendência. Verificar as habilitações de entrada.
+            begin
+              if (iDirecaoMercadoLat > 0) then
+                begin
+                  // Verificar entradas vendidas.
+                  if (High > (RT_10 + fRangeHabilitacaoLat)) then
+                    begin
+                      // Desabilita todas as entradas vendidas
+                      bEntradaBrancaHabilitadaLat := false;
+                      bEntradaFucsiaHabilitadaLat := false;
+                      bEntradaVerdeHabilitadaLat := false;
+                    end
+                  else 
+                    begin
+                      // Entrada branca segue habilitada
+                      bEntradaBrancaHabilitadaLat := true;
+                      if (High > (RT_20 + fRangeHabilitacaoLat)) then
+                        begin
+                          // Desabilita as entradas vendidas fucsia e verde.
+                          bEntradaFucsiaHabilitadaLat := false;
+                          bEntradaVerdeHabilitadaLat := false;
+                        end
+                      else 
+                        begin
+                          // Entrada fucsia segue habilitada
+                          bEntradaFucsiaHabilitadaLat := true;
+                          if (High > (RT_30 + fRangeHabilitacaoLat)) then
+                            begin
+                              // Desabilita a entrada vendida verde.
+                              bEntradaVerdeHabilitadaLat := false;
+                            end
+                          else
+                            begin
+                              // Entrada verde segue habilitada
+                              bEntradaVerdeHabilitadaLat := true;
+                            end;
+                        end;
+                    end;
+                end
+              else 
+                begin
+                  // Verificar entradas compradas.
+                  if (Low < (RT_90 - fRangeHabilitacaoLat)) then
+                    begin
+                      // Desabilita todas as entradas compradas
+                      bEntradaBrancaHabilitadaLat := false;
+                      bEntradaFucsiaHabilitadaLat := false;
+                      bEntradaVerdeHabilitadaLat := false;
+                    end
+                  else 
+                    begin
+                      // Entrada branca segue habilitada
+                      bEntradaBrancaHabilitadaLat := true;
+                      if (Low < (RT_80 - fRangeHabilitacaoLat)) then
+                        begin
+                          // Desabilita as entradas compradas fucsia e verde.
+                          bEntradaFucsiaHabilitadaLat := false;
+                          bEntradaVerdeHabilitadaLat := false;
+                        end
+                      else 
+                        begin
+                          // Entrada fucsia segue habilitada
+                          bEntradaFucsiaHabilitadaLat := true;
+                          if (Low < (RT_70 - fRangeHabilitacaoLat)) then
+                            begin
+                              // Desabilita a entrada comprada verde.
+                              bEntradaVerdeHabilitadaLat := false;
+                            end
+                          else
+                            begin
+                              // Entrada verde segue habilitada
+                              bEntradaVerdeHabilitadaLat := true;
+                            end;
+                        end;
+                    end;
+                end;
+            end;
+          ////======================================================================================================================================//
+          // Verificar se tocou os 50%. Lembrando que o toque só é válido se o mercado vier de uma tendência, e esse controle é efetuado pelas variáveis b_Tendencia50Alta e b_Tendencia50Baixa.
+          if b_Tendencia50Alta then
+            begin
+              // Mercado vem de uma possível tendência de alta. Verificar primeiramente se rompeu 5% do RM 21 ou se tocou na linha dos 70%, o que inviabiliza entradas compradas no 50%.
+              if (Low < (RT_50 - fRM21_5Percent)) OR (Low <= RT_70) then
+                begin
+                  // Rompeu os 5% RM 21 ou tocou nos 70%, resetar variáveis de compra do 50%.
+                  b_Tendencia50Alta := false;
+                  iToque50Alta := 0;
+                  fEntrada := 0;
+                end
+              else if (iToque50Alta = 0) AND (RT_50 >= Low) AND (RT_50 <= High) AND ((HighD(0) - LowD(0)) >= 2 * fRM21_10Percent) then
+                begin
+                  // Eh o primeiro toque nos 50% (só considera o 1o toque nos 50% se range do dia for maior ou igual a duas vezes o fRM21_10Percent.
+                  iToque50Alta := 1;
+                  // Como tocou os 50%, invalida os toques de tendencia.
+                  iToqueAltaFortissima := 0;
+                  iToqueAltaForte := 0;
+                  //iToqueAlta := 0;
+                  // Guardar o candle onde fez o 1o toque.
+                  iBarControleToque := CurrentBar;
+                end;
+            end
+          ////======================================================================================================================================//
+          else if b_Tendencia50Baixa then
+            begin
+              // Mercado vem de uma possível tendência de baixa. Verificar primeiramente se rompeu 5% do RM 21 ou se tocou na linha dos 30%, o que inviabiliza entradas vendidas no 50%.
+              if (High > (RT_50 + fRM21_5Percent)) OR (High >= RT_30) then
+                begin
+                  // Rompeu os 5% RM 21 ou tocou nos 30%, resetar variáveis de venda do 50%.
+                  b_Tendencia50Baixa := false;
+                  iToque50Baixa := 0;
+                  fEntrada := 0;
+                end
+              else if (iToque50Baixa = 0) AND (RT_50 >= Low) AND (RT_50 <= High) AND ((HighD(0) - LowD(0)) >= 2 * fRM21_10Percent) then
+                begin
+                  // Eh o primeiro toque no 50% (só considera o 1o toque nos 50% se range do dia for maior ou igual a duas vezes o fRM21_10Percent.
+                  iToque50Baixa := 1;
+                  // Como tocou os 50%, invalida os toques de tendencia.
+                  iToqueBaixaFortissima := 0;
+                  iToqueBaixaForte := 0;
+                  //iToqueBaixa := 0;
+                  // Guardar o candle onde fez o 1o toque.
+                  iBarControleToque := CurrentBar;
+                end;
+            end;
+          // Obter valor do ADX para complementar decisão de entrada e também proteção de trade.
+          if FiltroMelhoramento then
+            begin
+              fAdx := ADX(MelhoramentoPeriodo,MelhoramentoPeriodoMedia);
+              if (fAdx < MelhoramentoSaidaValor) AND (ModuloAutomacao) AND ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                begin
+                  if (isBought) then
+                    begin
+                      if (Stop_Loss < BuyPrice) AND (Close > (BuyPrice + BreakevenDistEntrada)) then
+                        Stop_Loss := (BuyPrice + BreakevenDistEntrada);
+                    end
+                  else if (isSold) then
+                    begin
+                      if (Stop_Loss > SellPrice) AND (Close < (SellPrice - BreakevenDistEntrada)) then
+                        Stop_Loss := (SellPrice - BreakevenDistEntrada);
+                    end;
+                end;
+            end
+          else 
+            begin
+              // Valor acima de 100 para que o ADX não seja um impeditivo para entradas.
+              fAdx := 200;
+            end;
+          ///=================================================================================================================================================================================================///
+          ///=================================================================================================================================================================================================///
+          ///                                             PARTE RESPONSAVEL POR IDENTIFICAR OS PONTOS DE ENTRADA                                                                                              ///
+          ///=================================================================================================================================================================================================///
+          // Se não estiver em tendência de alta ou de baixa, efetuar as entradas nas operações se as condições forem satisfeitas.
+          IF ( NOT HasPosition) AND (((DAYTRADE) AND (TIME >= iHoraEntrada) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) AND ((iMaxOperacoesTendencia < MaxOperacoesTendencia) OR (iMaxOperacoesLateral < MaxOperacoesLateral)) THEN
+            begin
+              // Como não tem posição aberta, deve-se resetar a variável de controle da contagem de operações.
+              bJaContouOperacao := false;
+              // Verificar se precisa cancelar alguma ordem apregoada que esteja longe do preço atual mais do que os 10% do RM 21 dias.
+              if (fUltimaApregoacao <> 0) AND ((ABS(fUltimaApregoacao - Close)) > fRM21_10Percent) then
+                begin
+                  CancelPendingOrders;
+                  fUltimaApregoacao := 0;
+                end;
+              // Só reinicializa a entrada se não estiver controlando ordens stop.
+              if (iEntradaStop) = 0 then
+                fEntrada := 0;
+              ///=============================================================================================================================================================================================///
+              /// ANALISAR O ENVIO DE ORDENS QUANDO O MERCADO ESTÁ EM TENDÊNCIA E USUÁRIO ESCOLHEU OPERAR TENDÊNCIA                                                                                           ///
+              ///=============================================================================================================================================================================================///
+              if (Tendencia) AND ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa) OR (b_Tendencia50Alta) OR (b_Tendencia50Baixa)) AND ((iMaxOperModeradoTendencia + iMaxOperAgressivoTendencia + iMaxOperUltraTendencia) < MaxOperacoesTendencia) then
+                begin
+                  ///=========================================================================================================================================================================================///
+                  ///                                             10% RASTREADOR É IGUAL A ULTRAAGRESSIVO                                                                                                     ///
+                  ///=========================================================================================================================================================================================///
+                  IF (UltraAgressivo) AND (b_TendenciaAltaFortissima) AND (iToqueAltaFortissima > 1) AND (iMaxOperUltraTendencia < MaxOperUltraTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                    begin
+                      // Já é pelo menos o segundo respeito na linha de tendência de alta fortíssima, então pode pendurar a ordem se a condição de distância mínima para o topo foi atingida.
+                      if (( not PrimeRompimentoReal) OR ((Highd(0) - fControleEntrada) >= fRompimentoReal)) AND ( not bEntradaBranca) then
+                        begin
+                          // Preço de entrada.
+                          fEntrada := RT_10;
+                        end;
+                    end
+                  else 
+                    ///=======================================================================================================================================================================================///
+                    ///                                             20% RASTREADOR É IGUAL A AGRESSIVO                                                                                                        ///
+                    ///=======================================================================================================================================================================================///
+                    IF (Agressivo) AND (b_TendenciaAltaForte) AND ( NOT b_TendenciaAltaFortissima) AND (iToqueAltaForte > 1) AND (iMaxOperAgressivoTendencia < MaxOperAgressivoTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                      begin
+                        // Já é pelo menos o segundo respeito na linha de tendência de alta forte, então pode pendurar a ordem se a condição de distância mínima para o topo foi atingida.
+                        if (( not PrimeRompimentoReal) OR ((Highd(0) - fControleEntrada) >= fRompimentoReal)) AND ( not bEntradaFucsia) then
+                          begin
+                            // Preço de entrada.
+                            fEntrada := RT_20;
+                          end;
+                      end
+                  else 
+                    ///=======================================================================================================================================================================================///
+                    ///                                             30% DO RASTREADOR É IGUAL A MODERADO                                                                                                      ///
+                    ///=======================================================================================================================================================================================///
+                    IF (Moderado) AND (b_TendenciaAlta) AND ( NOT b_TendenciaAltaFortissima) AND ( NOT b_TendenciaAltaForte) AND (iToqueAlta > 1) AND (iMaxOperModeradoTendencia < MaxOperModeradoTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                      begin
+                        // Já é pelo menos o segundo respeito na linha de tendência de alta, então pode pendurar a ordem se a condição de distância mínima para o topo foi atingida.
+                        if ((( not PrimeRompimentoReal) OR ((Highd(0) - fControleEntrada) >= fRompimentoReal)) AND ( not bEntradaVerde)) then
+                          begin
+                            // Preço de entrada.
+                            fEntrada := RT_30;
+                          end;
+                      end
+                  ///=========================================================================================================================================================================================///
+                  ///                                             50% DO RASTREADOR                                                                                                                           ///
+                  ///=========================================================================================================================================================================================///
+                  else if (Porcento50) AND (b_Tendencia50Alta) AND (iToque50Alta > 1) AND (iMaxOperPorcento50 < MaxOperPorcento50) then
+                    begin
+                      // Já é pelo menos o segundo respeito na linha dos 50% vindo de uma possível tendência de alta, então pode pendurar a ordem se a condição de distância mínima para o topo foi atingida.
+                      if (( not PrimeRompimentoReal) OR ((Highd(0) - fControleEntrada) >= fRompimentoReal)) AND ((Highd(0) - RT_50) >= 1.5 * fRM21_10Percent) AND ( not bEntrada50) then
+                        begin
+                          // Preço de entrada.
+                          fEntrada := RT_50;
+                        end;
+                    end;
+                  ///=========================================================================================================================================================================================///
+                  ///                                RESPONSAVEL PELO ENVIO DE ORDEM                                                                                                                          ///
+                  ///=========================================================================================================================================================================================///
+                  if (fEntrada <> 0) AND ((b_TendenciaAltaFortissima) OR (b_TendenciaAltaForte) OR (b_TendenciaAlta) OR (b_Tendencia50Alta)) AND (((ABS(fEntrada - Close)) <= fRM21_10Percent)) then
+                    begin
+                      // Guardar o valor que será apregoado;
+                      fUltimaApregoacao := fEntrada;
+                      // Tendo o valor da entrada definido, o envio das ordens a favor ou contra a estratégia é igual, independente do tipo da tendência de alta.
+                      if ( not ContraEstrategia) then
+                        begin
+                          Stop_Loss := fEntrada - fStopEmPontosTend;
+                          fStopEmPontos := fStopEmPontosTend;
+                          fGain := (fEntrada + fAlvoEmPontosTend);
+                          // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de compra no book.
+                          if (BidPrice >= fEntrada) then
+                            begin
+                              BuyLimit(fEntrada);
+                              //bControleEntrarOperacao := true;
+                              iEntradaStop := 0;
+                            end
+                          else if (high >= (fEntrada - fProximidadeToqueTick * MinPriceIncrement)) then
+                            begin
+                              // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                              BuyStop(fEntrada,fEntrada + OffsetEntradaStop);
+                              //bControleEntrarOperacao := true;
+                              iEntradaStop := 1;
+                              iBarControleStop := CurrentBar;
+                            end;
+                        end
+                      else 
+                        begin
+                          // Operação contra a estratégia
+                          Stop_Loss := fEntrada + fStopEmPontosTend;
+                          fStopEmPontos := fStopEmPontosTend;
+                          fGain := (fEntrada - fAlvoEmPontosTend);
+                          // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                          if (AskPrice <= fEntrada) then
+                            begin
+                              SellShortLimit(fEntrada);
+                              //bControleEntrarOperacao := true;
+                              iEntradaStop := 0;
+                            end
+                          else if (low <= (fEntrada + fProximidadeToqueTick * MinPriceIncrement)) then
+                            begin
+                              // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                              SellShortStop(fEntrada,fEntrada - OffsetEntradaStop);
+                              //bControleEntrarOperacao := true;
+                              iEntradaStop := - 1;
+                              iBarControleStop := CurrentBar;
+                            end;
+                        end;
+                    end
+                  else 
+                    // Não teve entrada na tendência de alta, verificar então se tem entrada na tendÊncia de baixa.
+                    begin
+                      ///=====================================================================================================================================================================================///
+                      ///                                             90% RASTREADOR É IGUAL A ULTRAAGRESSIVO                                                                                                 ///
+                      ///=====================================================================================================================================================================================///
+                      IF (UltraAgressivo) AND (b_TendenciaBaixaFortissima) AND (iToqueBaixaFortissima > 1) AND (iMaxOperUltraTendencia < MaxOperUltraTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                        begin
+                          // Já é pelo menos o segundo respeito na linha de tendência de baixa fortíssima, então pode pendurar a ordem se a condição de distância mínima para o fundo foi atingida.
+                          if (( not PrimeRompimentoReal) OR ((fControleEntrada - Lowd(0)) >= fRompimentoReal)) AND ( not bEntradaBranca) then
+                            begin
+                              // Preço de entrada.
+                              fEntrada := RT_90;
+                            end;
+                        end
+                      else 
+                        ///===================================================================================================================================================================================///
+                        ///                                             80% RASTREADOR É IGUAL A AGRESSIVO                                                                                                    ///
+                        ///===================================================================================================================================================================================///
+                        IF (Agressivo) AND (b_TendenciaBaixaForte) AND ( NOT b_TendenciaBaixaFortissima) AND (iToqueBaixaForte > 1) AND (iMaxOperAgressivoTendencia < MaxOperAgressivoTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                          begin
+                            // Já é pelo menos o segundo respeito na linha de tendência de baixa forte, então pode pendurar a ordem se a condição de distância mínima para o fundo foi atingida.
+                            if (( not PrimeRompimentoReal) OR ((fControleEntrada - Lowd(0)) >= fRompimentoReal)) AND ( not bEntradaFucsia) then
+                              begin
+                                // Preço de entrada.
+                                fEntrada := RT_80;
+                              end;
+                          end
+                      else 
+                        ///===================================================================================================================================================================================///
+                        ///                                             70% DO RASTREADOR É IGUAL A MODERADO                                                                                                  ///
+                        ///===================================================================================================================================================================================///
+                        IF (Moderado) AND (b_TendenciaBaixa) AND ( NOT b_TendenciaBaixaFortissima) AND ( NOT b_TendenciaBaixaForte) AND (iToqueBaixa > 1) AND (iMaxOperModeradoTendencia < MaxOperModeradoTendencia) AND (fAdx > MelhoramentoEntradaValor) THEN
+                          begin
+                            // Já é pelo menos o segundo respeito na linha de tendência de baixa, então pode pendurar a ordem se a condição de distância mínima para o fundo foi atingida.
+                            if (( not PrimeRompimentoReal) OR ((fControleEntrada - Lowd(0)) >= fRompimentoReal)) AND ( not bEntradaVerde) then
+                              begin
+                                // Preço de entrada.
+                                fEntrada := RT_70;
+                              end;
+                          end
+                      ///====================================================================================================================================================================================///
+                      ///                                             50% DO RASTREADOR                                                                                                                      ///
+                      ///====================================================================================================================================================================================///
+                      else if (Porcento50) AND (b_Tendencia50Baixa) AND (iToque50Baixa > 1) AND (iMaxOperPorcento50 < MaxOperPorcento50) then
+                        begin
+                          // Já é pelo menos o segundo respeito na linha dos 50% vindo de uma possível tendência de baixa, então pode pendurar a ordem se a condição de distância mínima para o fundo foi atingida.
+                          if (( not PrimeRompimentoReal) OR ((fControleEntrada - Lowd(0)) >= fRompimentoReal)) AND ((RT_50 - Lowd(0)) >= 1.5 * fRM21_10Percent) AND ( not bEntrada50) then
+                            begin
+                              // Preço de entrada.
+                              fEntrada := RT_50;
+                            end;
+                        end;
+                      ///====================================================================================================================================================================================///
+                      ///                                RESPONSAVEL PELO ENVIO DE ORDEM                                                                                                                     ///
+                      ///====================================================================================================================================================================================///
+                      if (fEntrada <> 0) AND ((b_TendenciaBaixaFortissima) OR (b_TendenciaBaixaForte) OR (b_TendenciaBaixa) OR (b_Tendencia50Baixa)) AND (((ABS(fEntrada - Close)) <= fRM21_10Percent)) then
+                        begin
+                          // Guardar o valor que será apregoado;
+                          fUltimaApregoacao := fEntrada;
+                          // Tendo o valor da entrada definido, o envio das ordens a favor ou contra a estratégia é igual, independente do tipo da tendência de baixa.
+                          if ( not ContraEstrategia) then
+                            begin
+                              Stop_Loss := fEntrada + fStopEmPontosTend;
+                              fStopEmPontos := fStopEmPontosTend;
+                              fGain := (fEntrada - fAlvoEmPontosTend);
+                              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                              if (AskPrice <= fEntrada) then
+                                begin
+                                  SellShortLimit(fEntrada);
+                                  //bControleEntrarOperacao := true;
+                                  iEntradaStop := 0;
+                                end
+                              else if (low <= (fEntrada + fProximidadeToqueTick * MinPriceIncrement)) then
+                                begin
+                                  // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                                  SellShortStop(fEntrada,fEntrada - OffsetEntradaStop);
+                                  //bControleEntrarOperacao := true;
+                                  iEntradaStop := - 1;
+                                  iBarControleStop := CurrentBar;
+                                end;
+                            end
+                          else 
+                            begin
+                              // Operação contra a estratégia
+                              Stop_Loss := fEntrada - fStopEmPontosTend;
+                              fStopEmPontos := fStopEmPontosTend;
+                              fGain := (fEntrada + fAlvoEmPontosTend);
+                              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                              if (BidPrice >= fEntrada) then
+                                begin
+                                  BuyLimit(fEntrada);
+                                  //bControleEntrarOperacao := true;
+                                  iEntradaStop := 0;
+                                end
+                              else if (high >= (fEntrada - fProximidadeToqueTick * MinPriceIncrement)) then
+                                begin
+                                  // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                                  BuyStop(fEntrada,fEntrada + OffsetEntradaStop);
+                                  //bControleEntrarOperacao := true;
+                                  iEntradaStop := 1;
+                                  iBarControleStop := CurrentBar;
+                                end;
+                            end;
+                        end;
+                    end;
+                end
+              else 
+                ///=================================================================================================================================================================================================///
+                // ANALISAR O ENVIO DE ORDENS QUANDO O MERCADO ESTÁ LATERAL E O USUÁRIO ESCOLHER OPERAR MERCADO LATERAL.
+                ///=================================================================================================================================================================================================///
+                if (Lateral) AND (iMaxOperacoesLateral < MaxOperacoesLateral) AND ((Highd(0) - Lowd(0)) >= (RangeVezesRM21Percent * fRM21_10Percent)) then
+                  begin
+                    if (iDirecaoMercadoLat > 0) then
+                      begin
+                        //  Analisar condição complementar para verificar se o mercado vem numa subida.
+                        if (Close[1] > Close[2]) AND (bVendasHabilitadasLat) then
+                          begin
+                            // Verificar entradas vendidas.
+                            if (bEntradaVerdeHabilitadaLat) AND (high >= (RT_30 - fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperModeradoLateral < MaxOperModeradoLateral) then
+                              begin
+                                fEntrada := RT_30;
+                                if ( not ContraEstrategia) then
+                                  begin
+                                    if (Simetria) then
+                                      fGain := RT_70
+                                    else 
+                                      fGain := (fEntrada - fAlvoEmPontosLat);
+                                  end
+                                else 
+                                  begin
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                  end;
+                              end
+                            else if (bEntradaFucsiaHabilitadaLat) AND (high >= (RT_20 - fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperAgressivoLateral < MaxOperAgressivoLateral) then
+                              begin
+                                fEntrada := RT_20;
+                                if ( not ContraEstrategia) then
+                                  begin
+                                    if (Simetria) then
+                                      fGain := RT_80
+                                    else 
+                                      fGain := (fEntrada - fAlvoEmPontosLat);
+                                  end
+                                else 
+                                  begin
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                  end;
+                              end
+                            else if (bEntradaBrancaHabilitadaLat) AND (high >= (RT_10 - fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperUltraLateral < MaxOperUltraLateral) then
+                              begin
+                                fEntrada := RT_10;
+                                if ( not ContraEstrategia) then
+                                  begin
+                                    if (Simetria) then
+                                      fGain := RT_90
+                                    else 
+                                      fGain := (fEntrada - fAlvoEmPontosLat);
+                                  end
+                                else 
+                                  begin
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                  end;
+                              end;
+                            if (fEntrada <> 0) then
+                              begin
+                                // Guardar o valor que será apregoado;
+                                fUltimaApregoacao := fEntrada;
+                                if ( not ContraEstrategia) then
+                                  begin
+                                    Stop_Loss := fEntrada + fStopEmPontosLat;
+                                    fStopEmPontos := fStopEmPontosLat;
+                                    SellShortLimit(fEntrada);
+                                    //bControleEntrarOperacao := true;
+                                    iEntradaStop := 0;
+                                  end
+                                else 
+                                  begin
+                                    // Operação contra a estratégia
+                                    Stop_Loss := fEntrada - fStopEmPontosLat;
+                                    fStopEmPontos := fStopEmPontosLat;
+                                    // Decidir se envia uma ordem limite ou stop de compra, de acordo com o melhor preço de compra no book.
+                                    if (BidPrice >= fEntrada) then
+                                      begin
+                                        BuyLimit(fEntrada);
+                                        //bControleEntrarOperacao := true;
+                                        iEntradaStop := 0;
+                                      end
+                                    else if (high >= (fEntrada - fProximidadeToqueTick * MinPriceIncrement)) then
+                                      begin
+                                        // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                                        BuyStop(fEntrada,fEntrada + OffsetEntradaStop);
+                                        //bControleEntrarOperacao := true;
+                                        iEntradaStop := 1;
+                                        iBarControleStop := CurrentBar;
+                                      end;
+                                  end;
+                              end;
+                          end;
+                      end
+                    else 
+                      //  Analisar condição complementar para verificar se o mercado vem numa descida.
+                      if (Close[1] < Close[2]) AND (bComprasHabilitadasLat) then
+                        begin
+                          // Verificar entradas compradas.
+                          if (bEntradaVerdeHabilitadaLat) AND (low <= (RT_70 + fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperModeradoLateral < MaxOperModeradoLateral) then
+                            begin
+                              fEntrada := RT_70;
+                              if ( not ContraEstrategia) then
+                                begin
+                                  if (Simetria) then
+                                    fGain := RT_30
+                                  else 
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                end
+                              else 
+                                begin
+                                  fGain := (fEntrada - fAlvoEmPontosLat);
+                                end;
+                            end
+                          else if (bEntradaFucsiaHabilitadaLat) AND (low <= (RT_80 + fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperAgressivoLateral < MaxOperAgressivoLateral) then
+                            begin
+                              fEntrada := RT_80;
+                              if ( not ContraEstrategia) then
+                                begin
+                                  if (Simetria) then
+                                    fGain := RT_20
+                                  else 
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                end
+                              else 
+                                begin
+                                  fGain := (fEntrada - fAlvoEmPontosLat);
+                                end;
+                            end
+                          else if (bEntradaBrancaHabilitadaLat) AND (low <= (RT_90 + fProximidadeToqueTick * MinPriceIncrement)) AND (iMaxOperUltraLateral < MaxOperUltraLateral) then
+                            begin
+                              fEntrada := RT_90;
+                              if ( not ContraEstrategia) then
+                                begin
+                                  if (Simetria) then
+                                    fGain := RT_10
+                                  else 
+                                    fGain := (fEntrada + fAlvoEmPontosLat);
+                                end
+                              else 
+                                begin
+                                  fGain := (fEntrada - fAlvoEmPontosLat);
+                                end;
+                            end;
+                          if (fEntrada <> 0) AND (((ABS(fEntrada - Close)) <= fRM21_10Percent)) then
+                            begin
+                              // Guardar o valor que será apregoado;
+                              fUltimaApregoacao := fEntrada;
+                              if ( not ContraEstrategia) then
+                                begin
+                                  Stop_Loss := fEntrada - fStopEmPontosLat;
+                                  fStopEmPontos := fStopEmPontosLat;
+                                  BuyLimit(fEntrada);
+                                  //bControleEntrarOperacao := true;
+                                  iEntradaStop := 0;
+                                end
+                              else 
+                                begin
+                                  // Operação contra a estratégia
+                                  Stop_Loss := fEntrada + fStopEmPontosLat;
+                                  fStopEmPontos := fStopEmPontosLat;
+                                  // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                                  if (AskPrice <= fEntrada) then
+                                    begin
+                                      SellShortLimit(fEntrada);
+                                      //bControleEntrarOperacao := true;
+                                      iEntradaStop := 0;
+                                    end
+                                  else if (low <= (fEntrada + fProximidadeToqueTick * MinPriceIncrement)) then
+                                    begin
+                                      // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                                      SellShortStop(fEntrada,fEntrada - OffsetEntradaStop);
+                                      //bControleEntrarOperacao := true;
+                                      iEntradaStop := - 1;
+                                      iBarControleStop := CurrentBar;
+                                    end;
+                                end;
+                            end;
+                        end;
+                  end;
+            end;
+        END;
+      ///=================================================================================================================================================================================================///
+      ///                                RESPONSAVEL PELO GERENCIAMENTO DO TRAILING STOP                                                                                                                  ///
+      ///=================================================================================================================================================================================================///
+      if (ModuloAutomacao) then
+        BEGIN
+          IF (IsBought) THEN
+            BEGIN
+              if (AutoBreakeven) then
+                begin
+                  // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+                  if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - fStopEmPontos)) then
+                    Stop_Loss := BuyPrice - fStopEmPontos;
+                  { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+                  if (close >= (BuyPrice + BreakevenTrigger)) and ( not BreakevenAtivado) then
+                    begin
+                      BreakevenAtivado := true;
+                      if (Stop_Loss < BuyPrice) then
+                        Stop_Loss := BuyPrice + BreakevenDistEntrada;
+                    end;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if (TrailingStop) then
+                begin
+                  if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                    begin
+                      TrailingStopAtivado := True;
+                      if (Stop_Loss > BuyPrice) then
+                        Stop_Loss := close - DistPrecoPontosTrigger;
+                    end;
+                  ////======================================================================================================================================//
+                  //==> quantos ticks o preço andou
+                  FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+                  if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                    begin
+                      Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                    end;
+                  ////======================================================================================================================================//
+                  // Verificar defesa agressiva
+                  if (DefesaAgressiva) then
+                    begin
+                      if ((Close - BuyPrice) = DefAgressivaGatilho1) OR ((Close - BuyPrice) = DefAgressivaGatilho2) OR ((Close - BuyPrice) = DefAgressivaGatilho3) then
+                        begin
+                          // Ajustar o stop "gain" e o novo FloorTraillingStop;
+                          FloorTraillingStop := Close;
+                          Stop_Loss := FloorTraillingStop - DefesaAgressivaPontos;
+                        end;
+                    end;
+                end;
+            END;
+          IF (IsSold) THEN
+            BEGIN
+              if (AutoBreakeven) then
+                begin
+                  // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+                  if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + fStopEmPontos)) then
+                    Stop_Loss := SellPrice + fStopEmPontos;
+                  { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+                  if (close <= (SellPrice - BreakevenTrigger)) and ( not BreakevenAtivado) then
+                    begin
+                      BreakevenAtivado := true;
+                      if (Stop_Loss > SellPrice) then
+                        Stop_Loss := SellPrice - BreakevenDistEntrada;
+                    end;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if (TrailingStop) then
+                begin
+                  if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                    begin
+                      TrailingStopAtivado := True;
+                      if (Stop_Loss < SellPrice) then
+                        Stop_Loss := close + DistPrecoPontosTrigger;
+                    end;
+                  ////======================================================================================================================================//
+                  //==> quantos ticks o preço andou
+                  FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+                  if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                    begin
+                      Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                    end;
+                  ////======================================================================================================================================//
+                  // Verificar defesa agressiva
+                  if (DefesaAgressiva) then
+                    begin
+                      if ((SellPrice - Close) = DefAgressivaGatilho1) OR ((SellPrice - Close) = DefAgressivaGatilho2) OR ((SellPrice - Close) = DefAgressivaGatilho3) then
+                        begin
+                          // Ajustar o stop "gain" e o novo FloorTraillingStop;
+                          FloorTraillingStop := Close;
+                          Stop_Loss := FloorTraillingStop + DefesaAgressivaPontos;
+                        end;
+                    end;
+                end;
+            END;
+          if ( Not HasPosition) then
+            begin
+              // Resetar as variáveis de controle do breakeven e do trailing stop.
+              BreakevenAtivado := false;
+              TrailingStopAtivado := false;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF (IsBought) AND ( NOT bJaContouOperacao) then
+        begin
+          // Resetar variável q controla a última apregoação.
+          fUltimaApregoacao := 0;
+          // Atualiza contador máximo de operações de cada tipo de mercado (tendência ou lateral) no dia.
+          if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa) OR (fEntrada = RT_50)) then
+            iMaxOperacoesTendencia := iMaxOperacoesTendencia + 1
+          else 
+            iMaxOperacoesLateral := iMaxOperacoesLateral + 1;
+          // Reseta variável de controle.
+          bJaContouOperacao := true;
+          // Verificar em qual preço entrou para contabilizar as entradas nas linhas correspondentes e também para não entrar novamente no mesmo preço e linha quando em tendência.
+          if (fEntrada = RT_10) OR (fEntrada = RT_90) then
+            begin
+              bEntradaBranca := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperUltraTendencia := iMaxOperUltraTendencia + 1
+              else 
+                iMaxOperUltraLateral := iMaxOperUltraLateral + 1;
+            end
+          else if (fEntrada = RT_20) OR (fEntrada = RT_80) then
+            begin
+              bEntradaFucsia := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperAgressivoTendencia := iMaxOperAgressivoTendencia + 1
+              else 
+                iMaxOperAgressivoLateral := iMaxOperAgressivoLateral + 1;
+            end
+          else if (fEntrada = RT_30) OR (fEntrada = RT_70) then
+            begin
+              bEntradaVerde := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperModeradoTendencia := iMaxOperModeradoTendencia + 1
+              else 
+                iMaxOperModeradoLateral := iMaxOperModeradoLateral + 1;
+            end
+          else if (fEntrada = RT_50) then
+            begin
+              bEntrada50 := true;
+              iMaxOperPorcento50 := iMaxOperPorcento50 + 1;
+            end;
+          fEntrada := 0;
+          iEntradaStop := 0;
+        end;
+      ////======================================================================================================================================//
+      IF (IsSold) AND ( NOT bJaContouOperacao) then
+        begin
+          // Resetar variável q controla a última apregoação.
+          fUltimaApregoacao := 0;
+          // Atualiza contador máximo de operações de cada tipo de mercado (tendência ou lateral) no dia.
+          if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa) OR (fEntrada = RT_50)) then
+            iMaxOperacoesTendencia := iMaxOperacoesTendencia + 1
+          else 
+            iMaxOperacoesLateral := iMaxOperacoesLateral + 1;
+          // Reseta variável de controle.
+          bJaContouOperacao := true;
+          // Verificar em qual preço entrou para contabilizar as entradas nas linhas correspondentes e também para não entrar novamente no mesmo preço e linha quando em tendência.
+          if (fEntrada = RT_90) OR (fEntrada = RT_10) then
+            begin
+              bEntradaBranca := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperUltraTendencia := iMaxOperUltraTendencia + 1
+              else 
+                iMaxOperUltraLateral := iMaxOperUltraLateral + 1;
+            end
+          else if (fEntrada = RT_80) OR (fEntrada = RT_20) then
+            begin
+              bEntradaFucsia := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperAgressivoTendencia := iMaxOperAgressivoTendencia + 1
+              else 
+                iMaxOperAgressivoLateral := iMaxOperAgressivoLateral + 1;
+            end
+          else if (fEntrada = RT_70) OR (fEntrada = RT_30) then
+            begin
+              bEntradaVerde := true;
+              if ((bTipoTendenciaAlta) OR (bTipoTendenciaBaixa)) then
+                iMaxOperModeradoTendencia := iMaxOperModeradoTendencia + 1
+              else 
+                iMaxOperModeradoLateral := iMaxOperModeradoLateral + 1;
+            end
+          else if (fEntrada = RT_50) then
+            begin
+              bEntrada50 := true;
+              iMaxOperPorcento50 := iMaxOperPorcento50 + 1;
+            end;
+          fEntrada := 0;
+          iEntradaStop := 0;
+        end;
+      // Chamar função que apregoa as saídas de stop e gain, gerenciando o "botão de pânico".
+      ApregoaSaida(STOP_LOSS,fGain,stopOffset);
+      ////======================================================================================================================================//
+      ////== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+      //      if (not HasPosition) and bControleEntrarOperacao and (iEntradaStop <> 0) and (fEntrada <> 0) then
+      if ( not HasPosition) and (iEntradaStop <> 0) and (fEntrada <> 0) then
+        begin
+          // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+          if (CurrentBar <= (iBarControleStop + iNroCandlesOrdem)) then
+            begin
+              if (CurrentBar > iBarControleStop) then
+                begin
+                  if (iEntradaStop > 0) then
+                    BuyStop(fEntrada,fEntrada + OffsetEntradaStop)
+                  else 
+                    SellShortStop(fEntrada,fEntrada - OffsetEntradaStop);
+                end;
+            end
+          else 
+            iEntradaStop := 0;
+        end;
+      ////======================================================================================================================================//
+      ////======================================================================================================================================//
+      {FECHAR TODAS POSIÇOES AM ABERTO}
+      IF (HasPosition) and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+        ClosePosition;
+      if (PlotarIndicador) AND (Date >= CalcDate(CurrentDate, - DiasPlotagem)) then
+        begin
+          // Desenhar as linhas.
+          SetPlotColor(1,clWhite);
+          SetPlotColor(2,clFuchsia);
+          SetPlotColor(3,clGreen);
+          SetPlotColor(4,clRed);
+          SetPlotColor(5,clGreen);
+          SetPlotColor(6,clFuchsia);
+          SetPlotColor(7,clWhite);
+          Plot(RT_10);
+          Plot2(RT_20);
+          Plot3(RT_30);
+          Plot4(RT_50);
+          Plot5(RT_70);
+          Plot6(RT_80);
+          Plot7(RT_90);
+        end;
+    end
+  else if (iHabilitaExecucaoPorCPF = - 1) then
+    begin
+      plotText("Só é possível operar Tendência e Lateral ao mesmo tempo se a opção AutoPiloto estiver habilitada. Favor conferir os parâmetros.",clRed,1,9);
+      // Fechar todas as ordens abertas e cancelar as ordens pendentes.
+      if (HasPosition) then
+        ClosePosition
+      else 
+        CancelPendingOrders;
+    end
+  else 
+    begin
+      plotText("Robô inoperante. Favor conferir CPF, data de expiração, horário de entrada, ativo e periodicidade. Se necessário, atualize sua versão.",clRed,1,9);
+      // Fechar todas as ordens abertas e cancelar as ordens pendentes.
+      if (HasPosition) then
+        ClosePosition
+      else 
+        CancelPendingOrders;
+    end;
+end;

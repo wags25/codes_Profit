@@ -1,0 +1,322 @@
+const
+  A1             = Asset("PTXUSDV",feedBMF);
+  DAYTRADE       = TRUE;
+  HORAENTRADA    = 0901;
+  HORASAIDA      = 0940;
+  HORAFECHAMENTO = 1640;
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(True);
+  StopEmPontos(5);
+  PrecoStopOffset(10);
+  AlvoEmPontos(77);
+  BreakevenEmPontos(7);
+  DistanciaEntradaPontos(0.5);
+  TraillingStopTrigger(13);
+  DistanciaPrecoPontos(7);
+  DistUltPreco(7);
+  FrequenciaAjuste(3);
+  respiro(0);
+  Dias(50);
+  UltraAgressivo(true);
+  Agressivo(false);
+  Conservador(false);
+  ContraEstrategia(false);
+var
+  F_ProximidadeToqueTick                                : float;
+  B_proximo_SU_Vol,B_proximo_RE_Vol                     : boolean;
+  B_proximo_Sfive_Vol,B_proximo_Rfive_Vol               : boolean;
+  B_proximo_Sten_Vol,B_proximo_Rten_Vol                 : boolean;
+  DiaNovo                                               : boolean;
+  ContadorDia                                           : integer;
+  PTAX1,PTAX2,PTAX3,PTAX4                               : float;
+  Vencimento,i,periodo,n,maior,nIndex                   : Integer;
+  MAX_previa,MIN_PREVIA                                 : float;
+  SUPORTE,TEN_SUPORTE,FIVE_SUPORTE                      : FLOAT;
+  RESISTENCIA,TEN_RESISTENCIA,FIVE_RESISTENCIA          : FLOAT;
+  vol_ptax                                              : float;
+  STOP_LOSS,ENTRADA,GAIN,R,RM                           : FLOAT;
+  ten_STOP_LOSS,five_STOP_LOSS,ten_ENTRADA,five_ENTRADA : float;
+  TrailingStopAtivado                                   : boolean;
+  FloorTraillingStop                                    : float;
+  BreakevenAtivado                                      : boolean;
+  TenPercent,fivePercent                                : float;
+  fProximidadeToqueTick                                 : float;
+begin
+  if (BarType = 1) then
+    begin
+      ///=================================================================================================================================================================================================///
+      //RESPONSAVEL POR PUXAR OS DADOS DA PTAX DO DIA ANTERIOR DA
+      if (Date > Date[1]) then
+        begin
+          // Eh um novo dia. Pegar parciais do dia anterior.
+          PTAX1 := a1.close[3] * 1000;
+          PTAX2 := a1.close[2] * 1000;
+          PTAX3 := a1.close[1] * 1000;
+          PTAX4 := a1.close[0] * 1000;
+          ///=================================================================================================================================================================================================///
+          // VERIFICA QUAL A MAIOR PREVIA
+          begin
+            MAX_previa := PTAX1;
+            IF PTAX2 > MAX_PREVIA THEN
+              MAX_previa := PTAX2;
+            IF PTAX3 > MAX_PREVIA THEN
+              MAX_previa := PTAX3;
+            IF PTAX4 > MAX_PREVIA THEN
+              MAX_previa := PTAX4;
+          end;
+          ///=================================================================================================================================================================================================///
+          // VERIFICA QUAL A MENOR PREVIA
+          begin
+            Min_previa := PTAX1;
+            IF PTAX2 < Min_PREVIA THEN
+              Min_previa := PTAX2;
+            IF PTAX3 < Min_PREVIA THEN
+              Min_previa := PTAX3;
+            IF PTAX4 < Min_PREVIA THEN
+              Min_previa := PTAX4;
+          end;
+          ///=================================================================================================================================================================================================///
+          // RESPONSAVEL POR VERIFICAR SE A VOL_PTAX É MENOR QUE 9.5
+          vol_ptax := max_previa - min_previa;
+          if vol_ptax <= 9.5 then
+            vol_ptax := vol_ptax * 2;
+          ///=================================================================================================================================================================================================///
+          nIndex := 0;
+          R := 0;
+          RM := 0;
+          Periodo := (21);
+          ///=================================================================================================================================================================================================///
+          //RANGE MEDIO   DOS 21 DIAS
+          for nIndex := 1 to (Periodo) Do
+            begin
+              R := R + (HighD(nIndex) - LowD(nIndex));
+            end;
+          ///=================================================================================================================================================================================================///
+          // CALCULA O RANGE MEDIO E OS PERCENTUAIS DE 10% E 5%
+          RM := Round2fraction(R / Periodo);
+          TenPercent := Round2Fraction((10 / 100) * Rm);
+          FivePercent := Round2Fraction((5 / 100) * Rm);
+
+          fProximidadeToqueTick := 2;
+        end;
+      ///=================================================================================================================================================================================================///
+      SUPORTE := (highd(0) - vol_ptax);
+      RESISTENCIA := (lowd(0) + vol_ptax);
+      ///=================================================================================================================================================================================================///
+      TEN_SUPORTE := suporte - TenPercent;
+      TEN_RESISTENCIA := RESISTENCIA + TenPercent;
+      ///=================================================================================================================================================================================================///
+      FIVE_SUPORTE := suporte - fivePercent;
+      FIVE_RESISTENCIA := RESISTENCIA + fivePercent;
+      ///=================================================================================================================================================================================================///
+      F_ProximidadeToqueTick := (2);
+      ///=================================================================================================================================================================================================///
+      B_proximo_SU_Vol := (low <= (suporte + F_ProximidadeToqueTick * MinPriceIncrement)) AND (low >= (suporte - F_ProximidadeToqueTick * MinPriceIncrement));
+      B_proximo_SFive_Vol := (low <= (FIVE_RESISTENCIA + F_ProximidadeToqueTick * MinPriceIncrement)) AND (low >= (FIVE_RESISTENCIA - F_ProximidadeToqueTick * MinPriceIncrement));
+      B_proximo_STen_Vol := (low <= (TEN_SUPORTE + F_ProximidadeToqueTick * MinPriceIncrement)) AND (low >= (TEN_SUPORTE - F_ProximidadeToqueTick * MinPriceIncrement));
+      ///=================================================================================================================================================================================================///
+      B_proximo_RE_Vol := (high >= (RESISTENCIA - F_ProximidadeToqueTick * MinPriceIncrement)) AND (high <= (RESISTENCIA + F_ProximidadeToqueTick * MinPriceIncrement));
+      B_proximo_RFive_Vol := (high >= (five_RESISTENCIA - F_ProximidadeToqueTick * MinPriceIncrement)) AND (high <= (five_RESISTENCIA + F_ProximidadeToqueTick * MinPriceIncrement));
+      B_proximo_RTen_Vol := (high >= (ten_RESISTENCIA - F_ProximidadeToqueTick * MinPriceIncrement)) AND (high <= (ten_RESISTENCIA + F_ProximidadeToqueTick * MinPriceIncrement));
+      Entrada := 0;
+      ///=================================================================================================================================================================================================///
+      if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) then
+        BEGIN
+          // Para entrar na linha da VolPTAX nao pode ter posição aberta.
+          IF ((UltraAgressivo = true) and ( not Agressivo) and ( not Conservador)) and (B_proximo_RE_Vol) THEN
+            begin
+              // PARÂMETROS DE ENTRADA E SAIDA
+              ENTRADA := resistência;
+            end
+          else 
+            ////======================================================================================================================================//
+            // Para entrar nas linhas de 5% e 10% da VolPTAX precisa ter posição aberta.
+            IF (( not UltraAgressivo) and (Agressivo = True) and ( not Conservador)) and (B_proximo_Rfive_Vol) THEN
+              begin
+                // PARÂMETROS DE ENTRADA E SAIDA
+                ENTRADA := FIVE_RESISTENCIA;
+              end
+          else 
+            ////======================================================================================================================================//
+            ////======================================================================================================================================//
+            IF (( not UltraAgressivo) and ( not Agressivo) and (Conservador = true)) and (B_proximo_Rten_Vol) THEN
+              begin
+                // PARÂMETROS DE ENTRADA E SAIDA
+                ENTRADA := TEN_RESISTENCIA;
+              end;
+
+          if (Entrada <> 0) AND (UltraAgressivo OR UltraAgressivo OR Conservador) then
+            begin
+              // Tendo o valor da entrada definido, o envio das ordens a favor ou contra a estratégia é igual, independente do tipo de resistência.
+              if not ContraEstrategia then
+                begin
+                  Stop_Loss := Entrada + StopEmPontos;
+                  Gain := (Entrada - AlvoEmPontos);
+                  // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                  if (AskPrice <= Entrada) then
+                    SellShortLimit(Entrada)
+                  else if (low <= (Entrada + fProximidadeToqueTick * MinPriceIncrement)) then
+                    // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                    SellShortStop(Entrada,Entrada);
+                end
+              else 
+                begin
+                  // Operação contra a estratégia
+                  Stop_Loss := Entrada - StopEmPontos;
+                  Gain := (Entrada + AlvoEmPontos);
+                  // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                  if (BidPrice >= Entrada) then
+                    BuyLimit(Entrada)
+                  else if (high >= (Entrada - fProximidadeToqueTick * MinPriceIncrement)) then
+                    // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                    BuyStop(Entrada,Entrada);
+                end;
+            end
+          else 
+            begin
+              // Não teve entrada nas resistências, verificar então se tem entrada nos suportes.
+              IF ((UltraAgressivo = true) and ( not Agressivo) and ( not Conservador)) and (B_proximo_SU_Vol) THEN
+                begin
+                  // PARÂMETROS DE ENTRADA E SAIDA
+                  ENTRADA := suporte;
+                end
+              else 
+                ////======================================================================================================================================//
+                IF (( not UltraAgressivo) and (Agressivo = True) and ( not Conservador)) and (B_proximo_Sfive_Vol) THEN
+                  begin
+                    // PARÂMETROS DE ENTRADA E SAIDA
+                    ENTRADA := FIVE_SUPORTE;
+                  end
+              else 
+                ////======================================================================================================================================//
+                IF (( not UltraAgressivo) and ( not Agressivo) and (Conservador = true)) and (B_proximo_Sten_Vol) THEN
+                  begin
+                    // PARÂMETROS DE ENTRADA E SAIDA
+                    ENTRADA := TEN_SUPORTE;
+                  end;
+
+              if (Entrada <> 0) AND (UltraAgressivo OR Agressivo OR Conservador) then
+                begin
+                  // Tendo o valor da entrada definido, o envio das ordens a favor ou contra a estratégia é igual, independente do tipo de suporte.
+                  if not ContraEstrategia then
+                    begin
+                      Stop_Loss := Entrada - StopEmPontos;
+                      Gain := (Entrada + AlvoEmPontos);
+                      // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                      if (BidPrice >= Entrada) then
+                        BuyLimit(Entrada)
+                      else if (high >= (Entrada - fProximidadeToqueTick * MinPriceIncrement)) then
+                        // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                        BuyStop(Entrada,Entrada);
+                    end
+                  else 
+                    begin
+                      // Operação contra a estratégia
+                      Stop_Loss := Entrada + StopEmPontos;
+                      Gain := (Entrada - AlvoEmPontos);
+                      // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+                      if (AskPrice <= Entrada) then
+                        SellShortLimit(Entrada)
+                      else if (low <= (Entrada + fProximidadeToqueTick * MinPriceIncrement)) then
+                        // Somente irá apregoar a ordem stop se a condição de proximidade da linha de tendência for satisfeita.
+                        SellShortStop(Entrada,Entrada);
+                    end;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+      ////======================================================================================================================================//
+      if ModuloAutomacao then
+        BEGIN
+          IF IsBought THEN
+            // TRAINLING STOP DE VENDA
+            BEGIN
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+              if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (STOP_LOSS) < BuyPrice then
+                    STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (STOP_LOSS) > BuyPrice then
+                    STOP_LOSS := Close - DistanciaPrecoPontos;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+              if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+                begin
+                  STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+                end;
+            END;
+          IF IsSold THEN
+            // TRAILING STOP DE VENDA
+            BEGIN
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+              if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if STOP_LOSS > SellPrice then
+                    STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if STOP_LOSS < SellPrice then
+                    STOP_LOSS := close + DistanciaPrecoPontos;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+              if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+                begin
+                  STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+                end;
+            END;
+          if Not HasPosition then
+            begin
+              // Resetar as variáveis de controle do breakeven e do trailing stop.
+              BreakevenAtivado := false;
+              TrailingStopAtivado := false;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought then
+        begin
+          SellToCoverLimit(Gain);
+          SellToCoverStop((STOP_LOSS),(STOP_LOSS - PrecoStopOffset));
+          IF (LOW < STOP_LOSS) THEN
+            SellToCoverAtMarket;
+        end;
+      IF IsSold THEN
+        begin
+          BuyToCoverLimit(GAIN);
+          BuyToCoverStop((STOP_LOSS),(STOP_LOSS + PrecoStopOffset));
+          IF (high > STOP_LOSS) THEN
+            BuyToCoverAtMarket;
+        end;
+
+      {FECHAR TODAS POSIÇOES AM ABERTO}
+      IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+        ClosePosition;
+      Vencimento := 1240630;
+      // altera a data 20/08/10
+      // if (((Date >= CalcDate(CurrentDate, - Dias)) and (CurrentDate <= Vencimento))) then
+      //begin
+        plot(suporte);
+        PLOT2(TEN_SUPORTE);
+        PLOT3(FIVE_SUPORTE);
+        plot4(resistencia);
+        PLOT5(TEN_RESISTENCIA);
+        PLOT6(FIVE_RESISTENCIA);
+      //end;
+    end;
+end;

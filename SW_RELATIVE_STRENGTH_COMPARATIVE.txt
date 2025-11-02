@@ -1,0 +1,119 @@
+const
+  wdo    = asset("wdofut",FeedBMF);
+  WIN    = ASSET("WINFUT",FeedBMF);
+  ibove  = asset("IBOV",feedBovespa);
+  Di1fut = Asset("DI1FUT",feedBMF);
+input
+  {AtivoDolfut(true);
+  AtivoWinfut(false);
+  AtivoDi1(false);
+  AtivoIbov(false); }
+  periodo(50);
+  MediaLonga(12);
+  MediaCurta(3);
+var
+  fastrs,fRelativeStrength,fastrs1 : float;
+  DP,D,RM,r                        : Float;
+  nIndex,nIndex1                   : integer;
+  ativoPrincipal,AtivoReferencia   : float;
+begin
+  nIndex := 0;
+  nIndex1 := 0;
+  fastrs := 0;
+  fastrs1 := 0;
+  //================================================================================================================//
+  if ((GetAsset() = "WINFUT") OR (GetAsset() = "INDFUT")) THEN
+    BEGIN
+      if (CurrentBar > periodo) then
+        begin
+          for nIndex := 1 to (periodo) Do
+            begin
+              if (close[nindex] <> 0) and (close[nindex - 1] <> 0) and (wDO.close[nindex] <> 0) and (wDO.close[nindex - 1] <> 0) then
+                BEGIN
+                  fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((Wdo.close[nindex - 1] / Wdo.close[nindex])) - 1);
+                end;
+            END;
+        end;
+    END;
+  //================================================================================================================//
+  if ((GetAsset() = "WDOFUT") OR (GetAsset() = "DOLFUT")) THEN
+    BEGIN
+      if (CurrentBar > periodo) then
+        begin
+          for nIndex := 1 to (periodo) Do
+            begin
+              //if (close[nindex] <> 0) and (close[nindex - 1] <> 0) and (WIN.close[nindex] <> 0) and (WIN.close[nindex - 1] <> 0) then
+                BEGIN
+                  fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((Win.close[nindex - 1] / Win.close[nindex])) - 1);
+                end;
+            end;
+        end;
+    END
+  else 
+    //================================================================================================================//
+    if ( not isbmf) {and (AtivoIbov = true) and (AtivoDi1 = false)}
+    THEN
+      BEGIN
+        if (bartype = 1) and (CurrentBar > periodo) then
+          begin
+            for nIndex := 1 to (periodo) Do
+              begin
+                fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((ibove.close[nindex - 1] / ibove.close[nindex])) - 1);
+              end;
+          end;
+        //================================================================================================================//
+        if (bartype = 2) and (CurrentBar > 126) then
+          begin
+            for nIndex := 1 to (126) Do
+              begin
+                fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((ibove.close[nindex - 1] / ibove.close[nindex])) - 1);
+              end;
+          end;
+        //================================================================================================================//
+        if (bartype = 3) and (CurrentBar > 52) then
+          begin
+            for nIndex := 1 to (52) Do
+              begin
+                fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((ibove.close[nindex - 1] / ibove.close[nindex])) - 1);
+              end;
+          end;
+      END;
+  //(AtivoDolfut = true) and (AtivoWinfut = false) (AtivoDolfut = false) and (AtivoWinfut = true)
+  { if (not isbmf) and (AtivoIbov = false) and (AtivoDi1 = true) THEN
+  BEGIN
+  if (CurrentBar > periodo) then
+  begin
+  for nIndex := 1 to (periodo) Do
+  begin
+  fastrs := fastrs + (((close[nindex - 1] / close[nindex])) / ((Di1fut.close[nindex - 1] / Di1fut.close[nindex])) - 1);
+  end;
+  end;
+  END; }
+  //================================================================================================================//
+  begin
+    fRelativeStrength := fastrs * 100;
+    select;
+    // alert(rgb(0,0,255));
+  end;
+  plot(fRelativeStrength);
+  if fRelativeStrength > 0 then
+    begin
+      SetPlotColor(1,rgb(0,128,128));
+      // paintbar(clgreen);
+    end
+  else 
+    begin
+      SetPlotColor(1,rgb(0,0,0));
+      // paintbar(clred);
+    end;
+  plot2(mediaexp(MediaLonga,fRelativeStrength));
+  plot3(WAverage(fRelativeStrength,MediaCurta));
+  SetPlotColor(2,clwhite);
+  SetPlotColor(3,clred);
+end;
+//=======================================================================================//
+//=======================================================================================//
+//=======================================================================================//
+//=======================================================================================//
+//=======================================================================================//
+//=======================================================================================//

@@ -1,0 +1,494 @@
+// *************************************************************
+// *************************************************************
+// ***************** SWS COM LIMITADORDêNCIA *******************
+// ********************* VERSAO 0.14 BETA **********************
+// *************************************************************
+// *************************************************************
+const
+  // Mude aqui a qtde maxima de trades por dia
+  // QtdeMaxOperacoesNoDia = 3;
+  DAYTRADE        = TRUE;
+  HORAENTRADA     = 0901;
+  HORASAIDA       = 1700;
+  HORAFECHAMENTO  = 1710;
+  CPF_INVALIDO    = 0;
+  CPF_NAO_TESTADO = 1;
+  CPF_OK          = 2;
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(True);
+  StopEmPontos(15);
+  AlvoEmPontos(25);
+  StopOffset(10);
+  AutoBreakeven(true);
+  BreakevenTrigger(7);
+  BreakevenDistanciaEntrada(0.5);
+  TrailingStop(true);
+  TraillingStopTrigger(12);
+  DistanciaPrecoPontosTrigger(7);
+  DistUltPrecoTrailing(7);
+  FrequenciaAjuste(3);
+  respiro(1);
+  QtdeMaxOperacoesNoDia(3);
+  ContraEstrategia(false);
+  CPF(62136633635);
+var
+  QtdeOperacoesNoDia                                    : integer;
+  DataAtual                                             : integer;
+  JaContouOperacao                                      : boolean;
+  ACGS,AVB,MME6,MME8,MME20,STOCH14,STOCH9,STOCH20       : FLOAT;
+  bDetectorSell_15Div,bDetectorBuy_15Div                : boolean;
+  bDetectorSell_10Div,bDetectorBuy_10Div                : boolean;
+  bDetectorSell_5Div,bDetectorBuy_5Div                  : boolean;
+  STOP_LOSS,ENTRADA,GAIN,R,Stop_Offset                  : FLOAT;
+  MM8,MM20,MM5                                          : FLOAT;
+  TrailingStopAtivado                                   : boolean;
+  FloorTraillingStop                                    : float;
+  BreakevenAtivado                                      : boolean;
+  PrecoStopOffset                                       : float;
+  nIndex                                                : Integer;
+  sSum                                                  : Float;
+  sFactor                                               : Float;
+  iHabilitaExecucaoPorCPF                               : integer;
+  //===========================================================//
+  COND1VR,COND2VR,COND3VR,COND4VR,COND5VR,COND6VR       : boolean;
+  COND1CR,COND2CR,COND3CR,COND4CR,COND5CR,COND6CR       : BOOLEAN;
+  bCond1Vr,bCond2Vr,bCond3Vr,bCond4Vr,bCond5Vr,bCond6Vr : boolean;
+  bCond1Cr,bCond2Cr,bCond3Cr,bCond4Cr,bCond5Cr,bCond6Cr : BOOLEAN;
+  ////======================================================================================================================================//
+procedure ApregoaSaida(fPrecoStopLoss : float;
+fPrecoGain : float;fOffsetEmPontos : float);
+begin
+  if IsBought then
+    begin
+      IF (LOW < fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              SellToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          SellToCoverLimit(fPrecoGain);
+          SellToCoverStop(fPrecoStopLoss,fPrecoStopLoss - fOffsetEmPontos);
+        end;
+    end;
+  ////======================================================================================================================================//
+  if IsSold then
+    begin
+      if (HIGH > fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              BuyToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          BuyToCoverLimit(fPrecoGain);
+          BuyToCoverStop(fPrecoStopLoss,fPrecoStopLoss + fOffsetEmPontos);
+        end;
+    end;
+end;
+function TestaCPF(iCPF : integer;
+iJaHabilitado : integer) : integer;
+const
+  TotalCPF = 2;
+var
+  i : integer;
+  bAchouCPF : boolean;
+  CPFs : Array[1..TotalCPF] of Integer;
+begin
+  if LastBarOnChart then
+    begin
+      if iJaHabilitado = 2 then
+        begin
+          result := iJaHabilitado;
+        end
+      else if iJaHabilitado = 1 then
+        begin
+          // **************************************************************************
+          // ***** Preencher aqui a lista de CPFs autorizados a utilizar o robô.
+          // ***** É interessante ter uma uma planilha Excel para gerar essa lista, no formato específico.
+          // **************************************************************************
+          // Lista de CPFs.
+          CPFs[1] := 62136633635;
+          CPFs[2] := 11168027675;
+          // **************************************************************************
+          bAchouCPF := false;
+          i := 1;
+          repeat
+            begin
+              if CPFs[i] = iCPF then
+                bAchouCPF := true;
+              i := i + 1;
+            end
+          until bAchouCPF OR (i > TotalCPF);
+          if bAchouCPF then
+            result := 2
+          else 
+            result := 0;
+        end;
+    end
+  else 
+    begin
+      // Ainda não chegou no último candle para fazer a pesquisa de CPF.
+      result := iJaHabilitado;
+    end;
+end;
+////======================================================================================================================================//
+begin
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+      iHabilitaExecucaoPorCPF := CPF_NAO_TESTADO;
+    end;
+  iHabilitaExecucaoPorCPF := TestaCPF(CPF,iHabilitaExecucaoPorCPF);
+  if iHabilitaExecucaoPorCPF > CPF_INVALIDO then
+    ////======================================================================================================================================//
+    begin
+      // PARAMETROS das Médias
+      if (CurrentBar = (8 - 1)) then
+        begin
+          sSum := 0;
+          for nIndex := 0 to (8 - 1) do
+            sSum := sSum + Close[nIndex];
+          MME8 := sSum / (8 - 1);
+          //////////////////////////////////////////
+          // Retorna o resultado da primeira posição
+        end
+      //////////////////
+      // Demais valores
+      else if (CurrentBar > (8 - 1)) then
+        begin
+          sFactor := 2 / (8 + 1);
+          MME8 := Close * sFactor + MME8[1] * (1 - sFactor);
+          ///////////////////////////////////////
+          // Retorna o resultado da posição atual
+        end;
+      //MME20 := MediaExp(20,CLOSE);
+      if (CurrentBar = (20 - 1)) then
+        begin
+          sSum := 0;
+          for nIndex := 0 to (20 - 1) do
+            sSum := sSum + Close[nIndex];
+          MME20 := sSum / (20 - 1);
+          //////////////////////////////////////////
+          // Retorna o resultado da primeira posição
+        end
+      //////////////////
+      // Demais valores
+      else if (CurrentBar > (20 - 1)) then
+        begin
+          sFactor := 2 / (20 + 1);
+          MME20 := Close * sFactor + MME20[1] * (1 - sFactor);
+          ///////////////////////////////////////
+          // Retorna o resultado da posição atual
+        end;
+      ///=================================================================================================================================================================================================///
+      //Parametros do SWS
+      bDetectorSell_5Div := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+      bDetectorBuy_5Div := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+      //=================================================================================================================//
+      bDetectorSell_10Div := (DivergenceDetector(10,10,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+      bDetectorBuy_10Div := (DivergenceDetector(10,10,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+      //=================================================================================================================//
+      bDetectorSell_15Div := (DivergenceDetector(15,15,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+      bDetectorBuy_15Div := (DivergenceDetector(15,15,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+      //=================================================================================================================//
+      ACGS := AccAgressSaldo(1);
+      AVB := AgressionVolBalance;
+      STOCH14 := SlowStochastic(14);
+      STOCH9 := SlowStochastic(9);
+      R := RESPIRO * MinPriceIncrement;
+      ///=================================================================================================================================================================================================///
+      // Condições para o renko
+      //// CONDICIONAIS VENDA
+      COND1VR := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      COND2VR := (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      COND3VR := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      COND4VR := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      COND5VR := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      COND6VR := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      /// CONDICIONAIS DE COMPRA
+      ////======================================================================================================================================//
+      COND1CR := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      COND2CR := (AVB < 0) AND (CLOSE < OPEN) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MMe8) AND (HIGH < MME20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      COND3CR := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      COND4CR := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      COND5CR := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      COND6CR := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      ///=================================================================================================================================================================================================///
+      //              SEGUNDA PARTE É PARA GRÁFICO DE CANDLE
+      //
+      ///=================================================================================================================================================================================================///
+      // bCondICIONAIS VENDA
+      bCOND1VR := (AVB > 0) AND ((CLOSE < OPEN) or (Close > open)) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      bCOND2VR := (AVB < 0) AND ((CLOSE < OPEN) or (Close > open)) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      bCOND3VR := ((ACGS > 0) AND (AVB > 0)) AND ((CLOSE < OPEN) or (Close > open)) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      bCOND4VR := (ACGS > 0) AND (AVB < 0) AND ((CLOSE < OPEN) or (Close > open)) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      bCOND5VR := ((ACGS < 0) AND (AVB < 0)) AND ((CLOSE < OPEN) or (Close > open)) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      bCOND6VR := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true));
+      /// CONDICIONAIS DE COMPRA
+      ////======================================================================================================================================//
+      bCOND1CR := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      bCOND2CR := (AVB < 0) AND ((CLOSE > OPEN) or (Close < OPen)) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MMe8) AND (HIGH < MME20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      bCOND3CR := (ACGS < 0) AND (AVB > 0) AND ((CLOSE > OPEN) or (Close < OPen)) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      bCOND4CR := (ACGS < 0) AND (AVB < 0) AND ((CLOSE > OPEN) or (Close < OPen)) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      bCOND5CR := (ACGS > 0) AND (AVB < 0) AND ((CLOSE > OPEN) or (Close < OPen)) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      bCOND6CR := (ACGS > 0) AND (AVB > 0) AND ((CLOSE > OPEN) or (Close < OPen)) AND (LOW < MMe8) AND (LOW < MME20) AND (HIGH < MMe8) AND (HIGH < MME20) AND (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true));
+      ///=================================================================================================================================================================================================///
+      IF ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) THEN
+        begin
+          // Como não tem posição aberta, deve-se resetar a variável de controle da contagem de operações.
+          JaContouOperacao := false;
+          if (GraphicInterval = itRenko) then
+            begin
+              if COND1VR OR COND2VR OR COND3VR OR COND4VR OR COND5VR OR COND6VR THEN
+                BEGIN
+                  paintbar(rgb(0,0,205));
+                  // plottext(low,clwhite,0,10);
+                  // PARÂMETROS DE ENTRADA E SAIDA
+                  if not ContraEstrategia then
+                    begin
+                      ENTRADA := Low - R;
+                      STOP_LOSS := entrada + StopEmPontos;
+                      Stop_Offset := STOP_LOSS + StopOffset;
+                      GAIN := (ENTRADA - AlvoEmPontos);
+                      if (AskPrice <= ENTRADA) then
+                        SellShortLimit(ENTRADA)
+                      else 
+                        SellShortStop(ENTRADA,ENTRADA);
+                    end
+                  else 
+                    begin
+                      ENTRADA := High + R;
+                      STOP_LOSS := entrada - StopEmPontos;
+                      Stop_Offset := STOP_LOSS - StopOffset;
+                      GAIN := (ENTRADA + AlvoEmPontos);
+                      if (BidPrice >= ENTRADA) then
+                        BuyLimit(ENTRADA)
+                      else 
+                        BuyStop(ENTRADA,ENTRADA);
+                    end;
+                END
+              ////======================================================================================================================================//
+              else 
+                ////======================================================================================================================================//
+                begin
+                  if COND1CR OR COND2CR OR COND3CR OR COND4CR OR COND5CR OR COND6CR THEN
+                    begin
+                      paintbar(rgb(255,255,0));
+                      // plottext(High,clwhite,0,10);
+                      // PARÂMETROS DE ENTRADA E SAIDA
+                      if not ContraEstrategia then
+                        begin
+                          ENTRADA := High + R;
+                          STOP_LOSS := entrada - StopEmPontos;
+                          Stop_Offset := STOP_LOSS - StopOffset;
+                          GAIN := (ENTRADA + AlvoEmPontos);
+                          if (BidPrice >= ENTRADA) then
+                            BuyLimit(ENTRADA)
+                          else 
+                            BuyStop(ENTRADA,ENTRADA);
+                        end
+                      else 
+                        begin
+                          ENTRADA := Low - R;
+                          STOP_LOSS := entrada + StopEmPontos;
+                          Stop_Offset := STOP_LOSS + StopOffset;
+                          GAIN := (ENTRADA - AlvoEmPontos);
+                          if (AskPrice <= ENTRADA) then
+                            SellShortLimit(ENTRADA)
+                          else 
+                            SellShortStop(ENTRADA,ENTRADA);
+                        end;
+                    end;
+                end;
+            end
+          //======================================================================================================================================//
+          //                                               SEGUNDA PARTE É PARA CANDLE                                                            //
+          //======================================================================================================================================//
+          else if (GraphicInterval = itMinute) then
+            BEGIN
+              if BCOND1VR OR BCOND2VR OR BCOND3VR OR BCOND4VR OR BCOND5VR OR BCOND6VR THEN
+                BEGIN
+                  paintbar(rgb(128,0,0));
+                  // plottext(low,clwhite,0,10);
+                  // PARÂMETROS DE ENTRADA E SAIDA
+                  if not ContraEstrategia then
+                    begin
+                      ENTRADA := Low - R;
+                      STOP_LOSS := entrada + StopEmPontos;
+                      Stop_Offset := STOP_LOSS + StopOffset;
+                      GAIN := (ENTRADA - AlvoEmPontos);
+                      if (AskPrice <= ENTRADA) then
+                        SellShortLimit(ENTRADA)
+                      else 
+                        SellShortStop(ENTRADA,ENTRADA);
+                    end
+                  else 
+                    begin
+                      ENTRADA := High + R;
+                      STOP_LOSS := entrada - StopEmPontos;
+                      Stop_Offset := STOP_LOSS - StopOffset;
+                      GAIN := (ENTRADA + AlvoEmPontos);
+                      if (BidPrice >= ENTRADA) then
+                        BuyLimit(ENTRADA)
+                      else 
+                        BuyStop(ENTRADA,ENTRADA);
+                    end;
+                END
+              ////======================================================================================================================================//
+              else 
+                ////======================================================================================================================================//
+                begin
+                  if bCOND1CR OR bCOND2CR OR bCOND3CR OR bCOND4CR OR bCOND5CR OR bCOND6CR THEN
+                    begin
+                      paintbar(rgb(139,0,139));
+                      // plottext(High,clwhite,0,10);
+                      // PARÂMETROS DE ENTRADA E SAIDA
+                      if not ContraEstrategia then
+                        begin
+                          ENTRADA := High + R;
+                          STOP_LOSS := entrada - StopEmPontos;
+                          Stop_Offset := STOP_LOSS - StopOffset;
+                          GAIN := (ENTRADA + AlvoEmPontos);
+                          if (BidPrice >= ENTRADA) then
+                            BuyLimit(ENTRADA)
+                          else 
+                            BuyStop(ENTRADA,ENTRADA);
+                        end
+                      else 
+                        begin
+                          ENTRADA := Low - R;
+                          STOP_LOSS := entrada + StopEmPontos;
+                          Stop_Offset := STOP_LOSS + StopOffset;
+                          GAIN := (ENTRADA - AlvoEmPontos);
+                          if (AskPrice <= ENTRADA) then
+                            SellShortLimit(ENTRADA)
+                          else 
+                            SellShortStop(ENTRADA,ENTRADA);
+                        end;
+                    end;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+      if ModuloAutomacao then
+        BEGIN
+          IF IsBought THEN
+            BEGIN
+              if AutoBreakeven then
+                begin
+                  // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+                  if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - StopEmPontos)) then
+                    Stop_Loss := BuyPrice - StopEmPontos;
+                  { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistanciaEntrada }
+                  if (close >= (BuyPrice + BreakevenTrigger)) and ( not BreakevenAtivado) then
+                    begin
+                      BreakevenAtivado := true;
+                      if Stop_Loss < BuyPrice then
+                        Stop_Loss := BuyPrice + BreakevenDistanciaEntrada;
+                    end;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if TrailingStop then
+                begin
+                  if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                    begin
+                      TrailingStopAtivado := True;
+                      if Stop_Loss > BuyPrice then
+                        Stop_Loss := close - DistanciaPrecoPontosTrigger;
+                    end;
+                  ////======================================================================================================================================//
+                  //==> quantos ticks o preço andou
+                  FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+                  if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                    begin
+                      Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                    end;
+                end;
+            END;
+          ////======================================================================================================================================//
+          IF IsSold THEN
+            BEGIN
+              if AutoBreakeven then
+                begin
+                  // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+                  if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + StopEmPontos)) then
+                    Stop_Loss := SellPrice + StopEmPontos;
+                  { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistanciaEntrada }
+                  if (close <= (SellPrice - BreakevenTrigger)) and ( not BreakevenAtivado) then
+                    begin
+                      BreakevenAtivado := true;
+                      if Stop_Loss > SellPrice then
+                        Stop_Loss := SellPrice - BreakevenDistanciaEntrada;
+                    end;
+                end;
+              ////======================================================================================================================================//
+              /// Parâmetros de trailing Stop
+              if TrailingStop then
+                begin
+                  if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                    begin
+                      TrailingStopAtivado := True;
+                      if Stop_Loss < SellPrice then
+                        Stop_Loss := close + DistanciaPrecoPontosTrigger;
+                    end;
+                  ////======================================================================================================================================//
+                  //==> quantos ticks o preço andou
+                  FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+                  if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                    begin
+                      Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                    end;
+                end;
+            END;
+          if Not HasPosition then
+            begin
+              // Resetar as variáveis de controle do breakeven e do trailing stop.
+              BreakevenAtivado := false;
+              TrailingStopAtivado := false;
+            end;
+        END;
+      ////======================================================================================================================================//
+      ApregoaSaida(STOP_LOSS,GAIN,stopOffset);
+      ////======================================================================================================================================//
+      if (IsBought) and ( Not JaContouOperacao) THEN
+        begin
+          // contabiliza a abertura da posição
+          QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+          JaContouOperacao := true;
+        end;
+      if (IsSold) and ( Not JaContouOperacao) THEN
+        begin
+          // contabiliza a abertura da posição
+          QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+          JaContouOperacao := true;
+        end;
+      ////======================================================================================================================================//
+      {FECHAR TODAS POSIÇOES AM ABERTO}
+      IF (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+        CLOSEPOSITION;
+    end
+  else 
+    plotText("CPF não autorizado!",clRed,1,9);
+END;

@@ -1,0 +1,49 @@
+const
+  wdo     = asset("wdofut",FeedBMF);
+  WIN     = ASSET("WINFUT",FeedBMF);
+  ibove   = asset("IBOV",feedBovespa);
+  Di1fut  = Asset("DI1FUT",feedBMF);
+  periodo = 5;
+input
+  percent1(0.50);
+  percent2(1.0);
+  percent3(1.5);
+  percent4(2.0);
+  percent5(2.5);
+VAR
+  pointcentral                      : float;
+  ENTRADA,STOP_LOSS,GAIN            : FLOAT;
+  TrailingStopAtivado               : boolean;
+  FloorTraillingStop                : float;
+  BreakevenAtivado                  : boolean;
+  PrecoStopOffset                   : float;
+  iDivisor,iPeriodo,i               : integer;
+  F_ProximidadeToqueTick            : float;
+  QtdeOperacoesNoDia                : integer;
+  DataAtual                         : integer;
+  JaContouOperacao                  : boolean;
+  closewin,closedol,opendDol,result : float;
+  iDataAtual                        : integer;
+  //======================================================================================================================================//
+begin
+  if (Date <> iDataAtual) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      iDataAtual := Date;
+      closewin := win.close[1];
+      closedol := wdo.close[1];
+      opendDol := wdo.open;
+      result := closewin / closedol;
+    end;
+  pointcentral := OpendDol * result;
+  plot(pointcentral);
+  plot2(pointcentral + (pointcentral * (percent1 / 100)));
+  plot3(pointcentral + (pointcentral * (percent2 / 100)));
+  plot4(pointcentral + (pointcentral * (percent3 / 100)));
+  plot5(pointcentral + (pointcentral * (percent4 / 100)));
+  plot6(pointcentral - (pointcentral * (percent1 / 100)));
+  plot7(pointcentral - (pointcentral * (percent2 / 100)));
+  plot8(pointcentral - (pointcentral * (percent3 / 100)));
+  plot9(pointcentral - (pointcentral * (percent4 / 100)));
+end;
+end;

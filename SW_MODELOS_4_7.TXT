@@ -1,0 +1,84 @@
+INPUT
+  ALVO(30);
+  TimeBar(12);
+VAR
+  TIME_BAR,CONT_CANDLE4,CONT_CANDLE7 : BOOLEAN;
+  ENTRADA,STOP_LOSS,GAIN             : FLOAT;
+begin
+  {CONDICIONAIS PARA O TEMPO DO CANDLE E NUMERO DO CANDLE}
+  TIME_BAR := BARDURATION = TimeBar;
+  CONT_CANDLE4 := ContadorDeCandle = 4.0;
+  CONT_CANDLE7 := ContadorDeCandle = 7.0;
+  {PRIMEIRA PARTE É DE ROMPIMENTO DA MÁXIMA DO CANDLE}
+  {IF (TIME_BAR = TRUE) THEN
+    BEGIN
+      IF (CONT_CANDLE4 = TRUE) AND ( Not (IsBought) e Not (IsSold)) THEN
+        BEGIN
+          paintbar(rgb(0,255,255));
+          plottext(high,clwhite,3,13);
+          ENTRADA := HIGH + 1;
+          // ENTRADA 1 PONTO ACIMA DA MÁXIMA DO CANDLE
+          BuyStop(ENTRADA,ENTRADA);
+          // EXECUTA A COMPRA LIMITE APREGOADA
+          STOP_LOSS := HIGH - RANGE - 1;
+          // STOP FICA NA MÍNIMA DO CANDLE ANTERIOR
+          GAIN := ENTRADA + ALVO;
+          // ORDEM DE STOP E DE GAIN
+          SellToCoverLimit(GAIN);
+          SellToCoverStop(STOP_LOSS,STOP_LOSS);
+        END;
+      IF IsBought THEN
+        // SE ESTIVER COMPRADO
+        BEGIN
+          SellToCoverLimit(GAIN);
+          SellToCoverStop(STOP_LOSS,STOP_LOSS);
+          IF (LOW < (STOP_LOSS - 1)) THEN
+            SellToCoverAtMarket;
+        END;
+      PLOT(GAIN);
+      PLOT2(STOP_LOSS);
+    END;
+  {SEGUNDA PARTE É DO ROMPIMENTO DA MÍNIMA DO CANDLE
+  IF (TIME_BAR = TRUE) THEN
+    BEGIN
+      IF (CONT_CANDLE4 = TRUE) AND ( Not (IsBought) e Not (IsSold)) THEN
+        BEGIN
+          paintbar(rgb(0,255,255));
+          plottext(low,clwhite,0,13);
+          ENTRADA := LOW - 1;
+          // ENTRADA 1 PONTO ACIMA DA MÁXIMA DO CANDLE
+          sellshortStop(ENTRADA,ENTRADA);
+          // EXECUTA A COMPRA LIMITE APREGOADA
+          STOP_LOSS := HIGH[1];
+          // STOP FICA NA MÁXIMA DO CANDLE ANTERIOR
+          GAIN := ENTRADA - ALVO;
+          // ORDEM DE STOP E DE GAIN
+          buyToCoverLimit(GAIN);
+          buyToCoverStop(STOP_LOSS,STOP_LOSS);
+        END;
+      IF IsSold THEN
+        // SE ESTIVER VENDIDO
+        BEGIN
+          buyToCoverLimit(GAIN);
+          buyToCoverStop(STOP_LOSS,STOP_LOSS);
+          IF (high > (STOP_LOSS + 1)) THEN
+            buyToCoverAtMarket;
+        END;
+    END;}
+  if (barduration = 4) and (ContadorDeCandle = 12) then
+    begin
+      paintbar(rgb(0,255,255));
+      alert(rgb(0,255,255));
+    end;
+     if (barduration = 4) and (ContadorDeCandle = 23) then
+    begin
+      paintbar(rgb(0,255,255));
+      alert(rgb(0,255,255));
+      plotText("23",clwhite,0); 
+    end;
+      if (barduration = 4) and (ContadorDeCandle = 40) then
+    begin
+      paintbar(rgb(0,255,255));
+      alert(rgb(0,255,255)); 
+    end;  
+END;

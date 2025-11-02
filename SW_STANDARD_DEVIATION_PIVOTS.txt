@@ -1,0 +1,116 @@
+input
+  Periodo(0);
+  Nivel_4(true);
+var
+  hv                      : float;
+  nindex                  : integer;
+  pivot                   : float;
+  lhvar,llvar,lcvar       : float;
+  lDev                    : float;
+  devP1,devP2,devP3,devP4 : float;
+  devN1,devN2,devN3,devN4 : float;
+begin
+  pivot := (highd(1) + lowd(1) + closed(1)) / 3;
+  lhvar := Power((highd(1) - pivot),2);
+  llvar := Power((lowd(1) - pivot),2);
+  lcvar := Power((closed(1) - pivot),2);
+  ldev := sqrt((lhvar + llvar + lcvar) / 3);
+ // ldev:=300;
+  //===========================================//
+  devP1 := (pivot + ldev);
+  devP2 := (pivot + 2 * ldev);
+  devP3 := (pivot + 3 * ldev);
+  devP4 := (pivot + 4 * ldev);
+  devN1 := (pivot - ldev);
+  devN2 := (pivot - 2 * ldev);
+  devN3 := (pivot - 3 * ldev);
+  devN4 := (pivot - 4 * ldev);
+  //=====================================//
+  if ((CalcDate(Date,Periodo) >= CurrentDate)) then
+    begin
+      plot(devP1);
+      plot2(devP2);
+      plot3(devP3);
+      Plot4(Pivot);
+      plot5(devN1);
+      plot6(devN2);
+      plot7(devN3);
+    
+  if (nivel_4 = true) then
+    begin
+      plot8(devP4);
+      plot9(devN4);
+    end;
+    end;
+    SetPlotColor(1,claqua);
+    SetPlotColor(2,claqua);
+    SetPlotColor(3,claqua);
+    SetPlotColor(8,claqua);
+    SetPlotColor(4,clyellow);
+    SetPlotColor(5,clmarrom);
+    SetPlotColor(6,clmarrom);
+    SetPlotColor(7,clmarrom);
+    SetPlotColor(9,clmarrom);
+    SetPlotStyle(4,1);
+end;
+
+
+
+
+
+
+
+{input
+  Periodo(0);
+  Nivel_4(false);
+var
+  hv                      : float;
+  nindex                  : integer;
+  pivot                   : float;
+  lhvar,llvar,lcvar       : float;
+  lDev                    : float;
+  devP1,devP2,devP3,devP4 : float;
+  devN1,devN2,devN3,devN4 : float;
+begin
+  pivot := (highd(1) + lowd(1) + closed(1)) / 3;
+  lhvar := Power((highd(1) - pivot),2);
+  llvar := Power((lowd(1) - pivot),2);
+  lcvar := Power((closed(1) - pivot),2);
+  ldev := sqrt((lhvar + llvar + lcvar) / 3);
+  //===========================================//
+  devP1 := (pivot + ldev);
+  devP2 := (pivot + 2 * ldev);
+  devP3 := (pivot + 3 * ldev);
+  devP4 := (pivot + 4 * ldev);
+  devN1 := (pivot - ldev);
+  devN2 := (pivot - 2 * ldev);
+  devN3 := (pivot - 3 * ldev);
+  devN4 := (pivot - 4 * ldev);
+  //=====================================//
+  if ((CalcDate(Date,Periodo) >= CurrentDate)) then
+    begin
+      plot(devP1);
+      plot2(devP2);
+      plot3(devP3);
+      Plot4(Pivot);
+      plot5(devN1);
+      plot6(devN2);
+      plot7(devN3);
+    
+  if (nivel_4 = true) then
+    begin
+      plot8(devP4);
+      plot9(devN4);
+    end;
+    end;
+    SetPlotColor(1,claqua);
+    SetPlotColor(2,claqua);
+    SetPlotColor(3,claqua);
+    SetPlotColor(8,claqua);
+    SetPlotColor(4,clyellow);
+    SetPlotColor(5,clmarrom);
+    SetPlotColor(6,clmarrom);
+    SetPlotColor(7,clmarrom);
+    SetPlotColor(9,clmarrom);
+    SetPlotStyle(4,1);
+end;{}

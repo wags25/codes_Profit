@@ -1,0 +1,128 @@
+input
+  PrecoFechamento(close);
+  PeriodoATR(14);
+  Coeficiente(1.0);
+  SemVolume(false);
+  MostrarSinais(true);
+  PeriodoMFI(14);
+  PeriodoSinal(8);
+  NivelSobrecompra(80);
+  NivelSobrevenda(20);
+var
+  fATR,fLimiteSuperior,fLimiteInferior,fAlphaTrend                           : Float;
+  CorTendencia                                                               : Integer;
+  bSinalCompra,bSinalVenda                                                   : Boolean;
+  iContadorCompra,iContadorVenda,iUltimaCompra,iUltimaVenda,DirecaoTendencia : Integer;
+  fPrecoMedio,fMFI,fMediaSinal                                               : Float;
+  bPrimeiraBarraCompra,bPrimeiraBarraVenda                                   : Boolean;
+  fcolor1                                                                    : float;
+begin
+  // Calcula o preço médio (fonte)
+  fPrecoMedio := (High + Low + Close) / 3;
+  // Calcula o MFI e sua média exponencial
+  fMFI := MoneyFlowIndex(PeriodoMFI);
+  fMediaSinal := MediaExp(PeriodoSinal,fMFI);
+  //============================================================//
+  // Calcula o ATR com base no True Range e no período
+  fATR := MediaExp(PeriodoATR,TrueRange());
+  // Cálculo dos limites superiores e inferiores com base no ATR e no coeficiente
+  fLimiteSuperior := Low - fATR * Coeficiente;
+  fLimiteInferior := High + fATR * Coeficiente;
+  //============================================================//
+  // Cálculo do AlphaTrend com ou sem volume
+  if SemVolume then
+    // Sem volume: usa o RSI para definir a tendência
+    if RSI(PeriodoATR,1) >= 50 then
+      if fLimiteSuperior < fAlphaTrend[1] then
+        fAlphaTrend := fAlphaTrend[1]
+  else 
+    fAlphaTrend := fLimiteSuperior
+  else if fLimiteInferior > fAlphaTrend[1] then
+    fAlphaTrend := fAlphaTrend[1]
+  else 
+    fAlphaTrend := fLimiteInferior
+  else 
+    // Com volume: usa o MFI para definir a tendência
+    if fMFI >= 50 then
+      if fLimiteSuperior < fAlphaTrend[1] then
+        fAlphaTrend := fAlphaTrend[1]
+  else 
+    fAlphaTrend := fLimiteSuperior
+  else if fLimiteInferior > fAlphaTrend[1] then
+    fAlphaTrend := fAlphaTrend[1]
+  else 
+    fAlphaTrend := fLimiteInferior;
+  //============================================================//
+  // Detecta cruzamentos para sinais de compra e venda manualmente
+  bSinalCompra := (fAlphaTrend[1] < fAlphaTrend[2]) and (fAlphaTrend >= fAlphaTrend[2]);
+  bSinalVenda := (fAlphaTrend[1] > fAlphaTrend[2]) and (fAlphaTrend <= fAlphaTrend[2]);
+  //============================================================//
+  // Contagem de barras desde o último sinal de compra e venda
+  if bSinalCompra then
+    iContadorCompra := 0
+  else 
+    iContadorCompra := iContadorCompra + 1;
+  if bSinalVenda then
+    iContadorVenda := 0
+  else 
+    iContadorVenda := iContadorVenda + 1;
+  //============================================================//
+  // Acessa as barras anteriores para a última compra e venda
+  iUltimaCompra := iContadorCompra[1];
+  // Valor da barra anterior para compra
+  iUltimaVenda := iContadorVenda[1];
+  // Valor da barra anterior para venda
+  //============================================================//
+  // Define a cor com base no valor atual do AlphaTrend
+  if fAlphaTrend > fAlphaTrend[2] then
+    begin
+      fcolor1 := clGreen;
+      paintbar(fcolor1);
+    end
+  else if fAlphaTrend < fAlphaTrend[2] then
+    begin
+      fcolor1 := clRed;
+      paintbar(fcolor1);
+    end
+  else 
+    begin
+      fcolor1 := clGray;
+      paintbar(fcolor1);
+    end;
+  //============================================================//
+  // Define a direção da tendência com base nos sinais e na contagem de barras
+  if bSinalCompra and (iUltimaCompra > iContadorVenda) then
+    DirecaoTendencia := 1
+  else if bSinalVenda and (iUltimaVenda > iContadorCompra) then
+    DirecaoTendencia := - 1
+  else 
+    DirecaoTendencia := DirecaoTendencia[1];
+  //============================================================//
+  // Pintar a primeira barra de sinal de compra e venda
+  if bSinalCompra and not bPrimeiraBarraCompra then
+    begin
+      select;
+      alert(clgreen);
+      PaintBar(clGreen);
+      // Pinta a barra de compra de verde
+      bPrimeiraBarraCompra := true;
+      // Marca que a barra de compra foi pintada
+      bPrimeiraBarraVenda := false;
+      // Reseta a variável de venda
+    end;
+  if bSinalVenda and not bPrimeiraBarraVenda then
+    begin
+      select;
+      alert(clred);
+      PaintBar(clRed);
+      // Pinta a barra de venda de vermelho
+      bPrimeiraBarraVenda := true;
+      // Marca que a barra de venda foi pintada
+      bPrimeiraBarraCompra := false;
+      // Reseta a variável de compra
+    end;
+  //============================================================//
+  // Plotagem do AlphaTrend e sua linha de gatilho
+  Plot(fAlphaTrend);
+  Plot2(fAlphaTrend[2]);
+end;

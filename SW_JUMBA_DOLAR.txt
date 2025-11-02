@@ -1,0 +1,568 @@
+CONST
+  DAYTRADE        = true;
+  HORAENTRADA     = 0900;
+  HORASAIDA       = 1710;
+  HORAFECHAMENTO  = 1730;
+  //DiasPlot        = 1;
+  //=======================/
+  Compra_Jumba_P1 = 1;
+  Venda_Jumba_P1  = - 1;
+  Compra_Jumba_P2 = 2;
+  Venda_Jumba_P2  = - 2;
+  Compra_Jumba_P3 = 3;
+  Venda_Jumba_P3  = - 3;
+  Compra_Jumba_P4 = 4;
+  Venda_Jumba_P4  = - 4;
+  Compra_Jumba_P5 = 5;
+  Venda_Jumba_P5  = - 5;
+  Compra_Jumba_P6 = 6;
+  Venda_Jumba_P6  = - 6;
+  //=======================/
+  {StopEmPontos           = 5;
+  StopOffset             = 10;
+  PrecoStopOffset        = 10;
+  AlvoEmPontos           = 77;
+  BreakevenEmPontos      = 7;
+  DistanciaEntradaPontos = 0.5;
+  TraillingStopTrigger   = 13;
+  DistanciaPrecoPontos   = 7;
+  DistUltPreco           = 7;
+  FrequenciaAjuste       = 3; }
+  respiro         = 0;
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  JUMBA1(4937.0);
+  JUMBA2(4912.0);
+  JUMBA3(4887.5);
+  JUMBA4(4862.5);
+  JUMBA5(4837.5);
+  JUMBA6(4812.5);
+  ModuloAutomacao(true);
+  StopEmPontos(5);
+  AlvoEmPontos(50);
+  StopOffset(10);
+  AutoBreakeven(true);
+  BreakevenTrigger(7);
+  BreakevenDistanciaEntrada(0.5);
+  TrailingStop(true);
+  TraillingStopTrigger(10);
+  DistanciaPrecoPontosTrigger(6);
+  DistUltPrecoTrailing(6);
+  FrequenciaAjuste(3);
+  DiasPlot(2);
+  ContraEstrategia(false);
+VAR
+  fJumbaP1,fJumbaP2,fJumbaP3,fJumbaP4,fJumbaP5,fJumbaP6                                     : float;
+  //=====================================================================================================//
+  bVendaJumbaP6,bVendaJumbaP5,bVendaJumbaP4,bVendaJumbaP3,bVendaJumbaP2,bVendaJumbaP1       : Boolean;
+  bCompraJumbaP6,bCompraJumbaP5,bCompraJumbaP4,bCompraJumbaP3,bCompraJumbaP2,bCompraJumbaP1 : Boolean;
+  //=====================================================================================================//
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset                                                        : FLOAT;
+  //=====================================================================================================//
+  B_prox_V_JumbaP1,B_prox_V_JumbaP2                                                         : Boolean;
+  B_prox_V_JumbaP3,B_prox_V_JumbaP4                                                         : boolean;
+  B_prox_V_JumbaP5,B_prox_V_JumbaP6                                                         : Boolean;
+  //=====================================================================================================//
+  B_prox_C_JumbaP1,B_prox_C_JumbaP2                                                         : Boolean;
+  B_prox_C_JumbaP3,B_prox_C_JumbaP4                                                         : boolean;
+  B_prox_C_JumbaP5,B_Prox_C_JumbaP6                                                         : Boolean;
+  //====================================================================================================//
+  F_ProximidadeToqueTick                                                                    : float;
+  TrailingStopAtivado                                                                       : boolean;
+  FloorTraillingStop                                                                        : float;
+  BreakevenAtivado                                                                          : boolean;
+  iOperacao                                                                                 : integer;
+  iNroCandlesOrdem,iEntradaStop                                                             : integer;
+  iBarControleStop                                                                          : integer;
+  DP,D,RM,r                                                                                 : Float;
+  nIndex                                                                                    : integer;
+  Periodo                                                                                   : integer;
+  fRM21_15Percent                                                                           : float;
+begin
+  // Verificar se é um novo dia.
+  if (Date > Date[1]) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      F_ProximidadeToqueTick := (3);
+      //entrada := 0;
+      //===================================//
+      B_prox_C_JumbaP1 := false;
+      B_prox_C_JumbaP2 := false;
+      B_prox_C_JumbaP3 := false;
+      B_prox_C_JumbaP4 := false;
+      B_prox_C_JumbaP5 := false;
+      B_Prox_C_JumbaP6 := false;
+      //===================================//
+      B_prox_V_JumbaP1 := false;
+      B_prox_V_JumbaP2 := false;
+      B_prox_V_JumbaP3 := false;
+      B_prox_V_JumbaP4 := false;
+      B_prox_V_JumbaP5 := false;
+      B_Prox_V_JumbaP6 := false;
+      //===================================//
+      // iOperacao irá controlar qual a entrada foi efetuada a fim de ser possivel desabilitar nova entrada no mesmo ponto antes de ocorrer uma nova habilitação desse ponto.
+      iOperacao := 0;
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 4;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+      //=============================================================//
+      nIndex := 0;
+      RM := 0;
+      D := 0;
+      DP := 0;
+      R := 0;
+      Periodo := (21);
+      //=============================================================//
+      //RANGE MEDIO DOS ULTIMOS 21 DIAS
+      for nIndex := 1 to (Periodo) Do
+        begin
+          R := R + (HighD(nIndex) - LowD(nIndex));
+        end;
+      RM := Round2fraction(R / Periodo);
+      fRM21_15Percent := Round2Fraction((10 / 100) * RM);
+      //============================================================//
+    end;
+  //========================//
+  fJumbaP6 := JUMBA6;
+  fJumbaP5 := JUMBA5;
+  fJumbaP4 := JUMBA4;
+  fJumbaP3 := JUMBA3;
+  fJumbaP2 := JUMBA2;
+  fJumbaP1 := JUMBA1;
+  //=========================================================================================================================================================//
+  B_Prox_C_JumbaP6 := (low <= (fJumbaP6 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fjumbap6);
+  B_prox_C_JumbaP5 := (low <= (fJumbaP5 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fjumbap5);
+  B_prox_C_JumbaP4 := (low <= (fJumbaP4 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fjumbap4);
+  B_prox_C_JumbaP3 := (low <= (fJumbaP3 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fjumbap3);
+  B_prox_C_JumbaP2 := (low <= (fJumbaP2 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fjumbap2);
+  B_prox_C_JumbaP1 := (low <= (fJumbaP1 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fJumbaP1);
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  B_prox_V_JumbaP6 := (HIGH >= (fJumbaP6 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP6);
+  B_prox_V_JumbaP5 := (HIGH >= (fJumbaP5 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP5);
+  B_prox_V_JumbaP4 := (HIGH >= (fJumbaP4 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP4);
+  B_prox_V_JumbaP3 := (high >= (fJumbaP3 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP3);
+  B_prox_V_JumbaP2 := (high >= (fJumbaP2 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP2);
+  B_prox_V_JumbaP1 := (high >= (fJumbaP1 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fJumbaP1);
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  // Analisar rompimentos de venda.
+  if Close > (fJumbaP1 + fRM21_15Percent) then
+    begin
+      // Todos os rompimentos Jumba de venda estão habilitados
+      bCompraJumbaP1 := true;
+      bCompraJumbaP2 := true;
+      bCompraJumbaP3 := true;
+      bCompraJumbaP4 := true;
+      bCompraJumbaP5 := true;
+      bCompraJumbaP6 := true;
+    end
+  else if Close > (fJumbaP2 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de P1 para baixo estão habilitados.
+      bCompraJumbaP2 := true;
+      bCompraJumbaP3 := true;
+      bCompraJumbaP4 := true;
+      bCompraJumbaP5 := true;
+      bCompraJumbaP6 := true;
+    end
+  else if Close > (fJumbaP3 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bCompraJumbaP3 := true;
+      bCompraJumbaP4 := true;
+      bCompraJumbaP5 := true;
+      bCompraJumbaP6 := true;
+    end
+  else if Close > (fJumbaP4 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bCompraJumbaP4 := true;
+      bCompraJumbaP5 := true;
+      bCompraJumbaP6 := true;
+    end
+  else if Close > (fJumbaP5 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bCompraJumbaP5 := true;
+      bCompraJumbaP6 := true;
+    end
+  else if (Close > (fJumbaP6 + fRM21_15Percent)) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bCompraJumbaP6 := true;
+    end;
+  //=========================================================================================================================================================//
+  // Analisar rompimentos de compra.
+  if Close < (fJumbaP6 - fRM21_15Percent) then
+    begin
+      // Todos os rompimentos Jumba de venda estão habilitados
+      bVendaJumbaP6 := true;
+      bVendaJumbaP5 := true;
+      bVendaJumbaP4 := true;
+      bVendaJumbaP3 := true;
+      bVendaJumbaP2 := true;
+      bVendaJumbaP1 := true;
+    end
+  else if Close < (fJumbaP5 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de P1 para baixo estão habilitados.
+      bVendaJumbaP5 := true;
+      bVendaJumbaP4 := true;
+      bVendaJumbaP3 := true;
+      bVendaJumbaP2 := true;
+      bVendaJumbaP1 := true;
+    end
+  else if Close < (fJumbaP4 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bVendaJumbaP4 := true;
+      bVendaJumbaP3 := true;
+      bVendaJumbaP2 := true;
+      bVendaJumbaP1 := true;
+    end
+  else if Close < (fJumbaP3 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bVendaJumbaP3 := true;
+      bVendaJumbaP2 := true;
+      bVendaJumbaP1 := true;
+    end
+  else if Close < (fJumbaP2 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bVendaJumbaP2 := true;
+      bVendaJumbaP1 := true;
+    end
+  else if (Close < fJumbaP1 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Jumba de venda de VendaJumba para baixo estão habilitados.
+      bVendaJumbaP1 := true;
+    end;
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) then
+    BEGIN
+      // Só reinicializa a entrada se não estiver controlando ordens stop.
+      if iEntradaStop = 0 then
+        Entrada := 0;
+      IF B_prox_V_JumbaP1 and bVendaJumbaP1 THEN
+        begin
+          iOperacao := VENDA_Jumba_P1;
+          ENTRADA := fJumbaP1;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP1 and bCompraJumbaP1 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P1;
+          ENTRADA := fJumbaP1;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_JumbaP2 and bVendaJumbaP2 THEN
+        begin
+          iOperacao := VENDA_Jumba_P2;
+          ENTRADA := fjUMBAP2;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP2 and bCompraJumbaP2 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P2;
+          ENTRADA := fJumbaP2;
+          STOP_LOSS := Entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_JumbaP3 and bVendaJumbaP3 THEN
+        begin
+          iOperacao := VENDA_Jumba_P3;
+          ENTRADA := fJumbaP3;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP3 and bCompraJumbaP3 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P3;
+          ENTRADA := fJumbaP3;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END
+      ////======================================================================================================================================//
+      //=========================================================================================================================================================//
+      else IF B_prox_V_JumbaP4 and bVendaJumbaP4 THEN
+        begin
+          iOperacao := VENDA_Jumba_P4;
+          ENTRADA := fJumbaP4;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (entrada - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP4 and bCompraJumbaP4 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P4;
+          ENTRADA := fJumbaP4;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_JumbaP5 and bVendaJumbaP5 THEN
+        begin
+          iOperacao := VENDA_Jumba_P5;
+          ENTRADA := fJumbaP5;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (entrada - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP5 and bCompraJumbaP5 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P5;
+          ENTRADA := fJumbaP5;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_JumbaP6 and bVendaJumbaP6 THEN
+        begin
+          iOperacao := VENDA_Jumba_P6;
+          ENTRADA := fJumbaP6;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (entrada - AlvoEmPontos);
+        end
+      else if B_prox_C_JumbaP6 and bCompraJumbaP6 then
+        BEGIN
+          iOperacao := COMPRA_Jumba_P6;
+          ENTRADA := fJumbaP6;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END;
+      //=========================================================================================================================================================//
+      if (Entrada <> 0) then
+        begin
+          // Verificar se é compra ou venda.
+          if ((iOperacao = COMPRA_Jumba_P1) OR (iOperacao = COMPRA_Jumba_P2) OR (iOperacao = COMPRA_Jumba_P3) OR (iOperacao = COMPRA_Jumba_P4) OR (iOperacao = COMPRA_Jumba_P5) OR (iOperacao = COMPRA_Jumba_P6) OR ((iOperacao = VENDA_Jumba_P1) OR (iOperacao = VENDA_Jumba_P2) OR (iOperacao = VENDA_Jumba_P3) OR (iOperacao = VENDA_Jumba_P4) OR (iOperacao = VENDA_Jumba_P5) OR (iOperacao = VENDA_Jumba_P6)) AND ContraEstrategia) then
+            begin
+              // Chegou em um rompimento comprador ou em um rompimento vendedor com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de compra, de acordo com o melhor preço de compra no book.
+              if (BidPrice >= Entrada) then
+                begin
+                  BuyLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (Entrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  BuyStop(Entrada,Entrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else 
+            begin
+              // Aqui é um rompimento vendedor ou um rompimento comprador com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+              if (AskPrice <= Entrada) then
+                begin
+                  SellShortLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (Entrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  SellShortStop(Entrada,Entrada);
+                  iEntradaStop := - 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+    end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsBought THEN
+        BEGIN
+          if AutoBreakeven then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - StopEmPontos)) then
+                Stop_Loss := BuyPrice - StopEmPontos;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistanciaEntrada }
+              if (close >= (BuyPrice + BreakevenTrigger)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if Stop_Loss < BuyPrice then
+                    Stop_Loss := BuyPrice + BreakevenDistanciaEntrada;
+                end;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if TrailingStop then
+            begin
+              if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if Stop_Loss > BuyPrice then
+                    Stop_Loss := close - DistanciaPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                end;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsSold THEN
+        BEGIN
+          if AutoBreakeven then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + StopEmPontos)) then
+                Stop_Loss := SellPrice + StopEmPontos;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistanciaEntrada }
+              if (close <= (SellPrice - BreakevenTrigger)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if Stop_Loss > SellPrice then
+                    Stop_Loss := SellPrice - BreakevenDistanciaEntrada;
+                end;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if TrailingStop then
+            begin
+              if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if Stop_Loss < SellPrice then
+                    Stop_Loss := close + DistanciaPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                end;
+            end;
+        END;
+      if Not HasPosition then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    begin
+      // Verificar qual o ponto de venda para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = VENDA_JUMBA_P1) then
+        // Desabilitar rompimento Jumba de venda de P1.
+        bVendaJUMBAP1 := false
+      else if (iOperacao = VENDA_JUMBA_P2) then
+        // Desabilitar rompimento Jumba de venda de P2.
+        bVendaJUMBAP2 := false
+      else if (iOperacao = VENDA_JUMBA_P3) then
+        // Desabilitar rompimento Jumba de venda de P1.
+        bVendaJUMBAP3 := false
+      else if (iOperacao = VENDA_JUMBA_P4) then
+        // Desabilitar rompimento Jumba de venda de P2.
+        bVendaJUMBAP4 := false
+      else if (iOperacao = VENDA_JUMBA_P5) then
+        // Desabilitar rompimento Jumba de venda de P1.
+        bVendaJUMBAP5 := false
+      else if (iOperacao = VENDA_JUMBA_P6) then
+        // Desabilitar rompimento Jumba de venda de P2.
+        bVendaJUMBAP6 := false;
+      //======================================================================================================================================//
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop(STOP_LOSS,Stop_Offset);
+      iEntradaStop := 0;
+      IF (high > STOP_LOSS) THEN
+        BuyToCoverAtMarket;
+    end;
+  //======================================================================================================================================//
+  IF IsBought then
+    begin
+      // Verificar qual o ponto de compra para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = COMPRA_JUMBA_P1) then
+        // Desabilitar rompimento Jumba de compra de P1.
+        bCompraJUMBAP1 := false
+      else if (iOperacao = COMPRA_JUMBA_P2) then
+        // Desabilitar rompimento Jumba de compra de P2.
+        bCompraJUMBAP2 := false
+      else if (iOperacao = COMPRA_JUMBA_P3) then
+        // Desabilitar rompimento Jumba de compra de P1.
+        bCompraJUMBAP3 := false
+      else if (iOperacao = COMPRA_JUMBA_P4) then
+        // Desabilitar rompimento Jumba de compra de P2.
+        bCompraJUMBAP4 := false
+      else if (iOperacao = COMPRA_JUMBA_P5) then
+        // Desabilitar rompimento Jumba de compra de P1.
+        bCompraJUMBAP5 := false
+      else if (iOperacao = COMPRA_JUMBA_P6) then
+        // Desabilitar rompimento Jumba de compra de P2.
+        bCompraJUMBAP6 := false;
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,Stop_Offset);
+      iEntradaStop := 0;
+      IF (LOW < STOP_LOSS) or (close < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  ////== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+  if not HasPosition and (iEntradaStop <> 0) and (Entrada <> 0) then
+    begin
+      // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(Entrada,Entrada)
+              else 
+                SellShortStop(Entrada,Entrada);
+            end;
+        end
+      else 
+        iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  //=========================================================================================================================================================//
+  if (Date >= CalcDate(CurrentDate, - DiasPlot)) then
+    begin
+      Plot(JUMBA1);
+      Plot2(JUMBA2);
+      Plot3(JUMBA3);
+      Plot4(JUMBA4);
+      Plot5(JUMBA5);
+      Plot6(JUMBA6);
+    end;
+  //=========================================================================================================================================================//
+end;

@@ -1,0 +1,105 @@
+input
+  stDevPeriod(200); // Período para cálculo do desvio padrão
+  expAvgPeriod(100); // Período para cálculo da média móvel exponencial
+  stopTicks(10); // Ticks para Stop Loss
+  takeProfit1Ticks(30); // Ticks para o Take Profit 1
+  takeProfit2Ticks(100); // Ticks para o Take Profit 2
+  tickSize(0.01); // Tamanho do Tick do ativo
+
+var
+  ema21 : float; // Média Móvel Exponencial
+  distanceToEMA : float; // Distância percentual da EMA até o preço de fechamento
+  stDevDistance : float; // Desvio padrão das distâncias percentuais
+  secondStDevUpper : float; // Segundo desvio padrão superior
+  secondStDevLower : float; // Segundo desvio padrão inferior
+  thirdStDevUpper : float; // Terceiro desvio padrão superior
+  thirdStDevLower : float; // Terceiro desvio padrão inferior
+  longEntryPrice : float; // Preço de entrada long
+  shortEntryPrice : float; // Preço de entrada short
+  longStopPrice : float; // Preço de Stop long
+  shortStopPrice : float; // Preço de Stop short
+  longTakeProfit1 : float; // Preço do primeiro Take Profit long
+  longTakeProfit2 : float; // Preço do segundo Take Profit long
+  shortTakeProfit1 : float; // Preço do primeiro Take Profit short
+  shortTakeProfit2 : float; // Preço do segundo Take Profit short
+  movedToBreakeven : boolean; // Indicador se moveu o stop para o breakeven
+
+array
+  distanceArray[stDevPeriod] : float; // Array para as distâncias percentuais
+
+begin
+  ema21 := MediaExp(expAvgPeriod, Close);
+
+  distanceToEMA := (Close - ema21) / ema21 * 100;
+  distanceArray[0] := distanceToEMA;
+
+  if (CurrentBar > stDevPeriod) then
+  begin
+    stDevDistance := DesvioPadrao(distanceArray, stDevPeriod);
+    
+    secondStDevUpper := ema21 + ema21 * (stDevDistance * 2 / 100);
+    secondStDevLower := ema21 - ema21 * (stDevDistance * 2 / 100);
+    thirdStDevUpper := ema21 + ema21 * (stDevDistance * 3 / 100);
+    thirdStDevLower := ema21 - ema21 * (stDevDistance * 3 / 100);
+    
+    Plot1(secondStDevUpper, "Second StDev Upper");
+    Plot2(secondStDevLower, "Second StDev Lower");
+    Plot3(thirdStDevUpper, "Third StDev Upper");
+    Plot4(thirdStDevLower, "Third StDev Lower");
+
+    if (Low <= secondStDevLower) or (Low <= thirdStDevLower) then
+    begin
+      longEntryPrice := High + tickSize;
+      longStopPrice := longEntryPrice - stopTicks * tickSize;
+      movedToBreakeven := false;
+      BuyLimit(longEntryPrice, 1);
+      SetStopPrice(longStopPrice);
+    end;
+
+    if (High >= secondStDevUpper) or (High >= thirdStDevUpper) then
+    begin
+      shortEntryPrice := Low - tickSize;
+      shortStopPrice := shortEntryPrice + stopTicks * tickSize;
+      movedToBreakeven := false;
+      SellShortLimit(shortEntryPrice, 1);
+      SetStopPrice(shortStopPrice);
+    end;
+
+    if (PositionSize > 0) then
+    begin
+      longTakeProfit1 := longEntryPrice + takeProfit1Ticks * tickSize;
+      longTakeProfit2 := longEntryPrice + takeProfit2Ticks * tickSize;
+      SellLimit(longTakeProfit1, PositionSize);
+      SellLimit(longTakeProfit2, PositionSize);
+
+      if (not movedToBreakeven) and (High >= longTakeProfit1) then
+      begin
+        SetStopPrice(longEntryPrice);
+        movedToBreakeven := true;
+      end;
+    end;
+
+    if (PositionSize < 0) then
+    begin
+      shortTakeProfit1 := shortEntryPrice - takeProfit1Ticks * tickSize;
+      shortTakeProfit2 := shortEntryPrice - takeProfit2Ticks * tickSize;
+      BuyToCoverLimit(shortTakeProfit1, abs(PositionSize));
+      BuyToCoverLimit(shortTakeProfit2, abs(PositionSize));
+
+      if (not movedToBreakeven) and (Low <= shortTakeProfit1) then
+      begin
+        SetStopPrice(shortEntryPrice);
+        movedToBreakeven := true;
+      end;
+    end;
+
+    if (Hour(Time) = 16) and (Minute(Time) >= 50) then
+    begin
+      if (PositionSize > 0) then
+        ClosePosition;
+
+      if (PositionSize < 0) then
+        ClosePosition;
+    end;
+  end;
+end;

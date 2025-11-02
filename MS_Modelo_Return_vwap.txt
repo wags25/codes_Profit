@@ -1,0 +1,354 @@
+{ o codigo consiste em  pegar o range medio dos ultimos 21 dias e usar
+esses pontos como entrada com retorno a vwap}
+const
+  DAYTRADE             = TRUE;
+  HORAENTRADA          = 0901;
+  HORASAIDA            = 1700;
+  HORAFECHAMENTO       = 1710;
+  Vencimento           = 1250630;
+  dias                 = 5;
+  compraSuporte        = 1;
+  VendaResistencia     = - 1;
+  CompraDesvSuporte    = 2;
+  VendaDesvResistencia = - 1;
+Input
+  ModuloAutomacao(True);
+  { StopEmPontos(150);
+  StopOffset(75);
+  AlvoEmPontos(1000);
+  BreakevenEmPontos(600);
+  DistanciaEntradaPontos(25);
+  TraillingStopTrigger(600);
+  DistanciaPrecoPontos(100);
+  DistUltPreco(100);
+  FrequenciaAjuste(50);}
+  StopEmPontos(5);
+  stopOffset(10);
+  AlvoEmPontos(77);
+  BreakevenEmPontos(7);
+  DistanciaEntradaPontos(0.5);
+  TraillingStopTrigger(11);
+  DistanciaPrecoPontos(8);
+  DistUltPreco(8);
+  FrequenciaAjuste(3);
+  QtdeMaxOperacoesNoDia(2);
+  periodo(21);
+  ContraEstrategia(false);
+var
+  DP,D1,R,D,RM                                             : Float;
+  frange                                                   : array[1..21] of float;
+  n,nIndex                                                 : integer;
+  suporte,resistencia,fvwap                                : float;
+  Desv_Suporte,Desv_resistencia                            : float;
+  fDiferSup,fDiferRes,F_ProximidadeToqueTick               : float;
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset                       : FLOAT;
+  TrailingStopAtivado                                      : boolean;
+  FloorTraillingStop                                       : float;
+  BreakevenAtivado                                         : boolean;
+  PrecoStopOffset                                          : float;
+  B_Prox_C_Suporte,B_Prox_V_Resistencia                    : boolean;
+  B_Prox_C_Desv_Suporte,B_Prox_V_Desv_Resistencia          : boolean;
+  bCompraSuporte,bCompraDesvSuporte                        : boolean;
+  bVendaResistencia,bVendaDesvResistencia                  : boolean;
+  QtdeOperacoesNoDia                                       : integer;
+  DataAtual                                                : integer;
+  JaContouOperacao                                         : boolean;
+  iOperacao,iNroCandlesOrdem,iEntradaStop,iBarControleStop : integer;
+  frangeDia                                                : float;
+begin
+  if (Date > Date[1]) {and (((Date >= CalcDate(CurrentDate, - Dias)) and (CurrentDate <= Vencimento)))}
+  then
+    //========================================================//
+    begin
+      frangeDia := highd(0) - lowd(0);
+      B_Prox_C_Suporte := false;
+      B_Prox_V_Resistencia := false;
+      B_Prox_C_Desv_Suporte := false;
+      B_Prox_V_Desv_Resistencia := false;
+      //===================================//
+      // iOperacao irá controlar qual a entrada foi efetuada a fim de ser possivel desabilitar nova entrada no mesmo ponto antes de ocorrer uma nova habilitação desse ponto.
+      iOperacao := 0;
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 4;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+      //========================================================//
+      nIndex := 0;
+      R := 0;
+      RM := 0;
+      D := 0;
+      //========================================================//
+      //RANGE MEDIO
+      for nIndex := 1 to 21 Do
+        begin
+          frange[nindex] := (HighD(nIndex) - LowD(nIndex));
+        end;
+      //============================================================//
+      for nindex := 1 to 21 Do
+        begin
+          RM := Rm + frange[nindex];
+        end;
+      Rm := Rm / 21;
+      //============================================================//
+      // DESVIO PADRÃO
+      for nIndex := 1 to (21) Do
+        begin
+          frange[nindex] := square((HighD(nIndex) - LowD(nIndex)) - RM);
+          D := D + frange[nIndex];
+        end;
+      DP := Sqrt(D / 21);
+      //============================================================//
+    end;
+  //===========================================================================================================================================================================//
+  //calculo dos suporte e resistencias baseados no range media e desvio padrão
+  resistencia := Round2Fraction(lowD(0) + RM);
+  suporte := Round2Fraction(HighD(0) - RM);
+  Desv_Suporte := Round2Fraction(HighD(0) - (RM - DP));
+  Desv_resistencia := Round2Fraction(LowD(0) + (RM - DP));
+  //===========================================================================================================================================================================//
+  // calculo de alvo até a vwap
+  fvwap := vwap(1);
+  fDiferSup := fvwap - suporte;
+  fDiferRes := resistencia - fvwap;
+  F_ProximidadeToqueTick := (5);
+  //===========================================================================================================================================================================//
+  //Condição de proximidade dos pontos
+  B_Prox_C_Suporte := (low <= (suporte + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= suporte);
+  B_Prox_C_Desv_Suporte := (low <= (Desv_resistencia + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= Desv_Suporte);
+  B_Prox_v_Resistencia := (HIGH >= (resistencia - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= resistencia);
+  B_Prox_V_Desv_Resistencia := (HIGH >= (Desv_resistencia - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= Desv_resistencia);
+  //===========================================================================================================================================================================//
+  // plot dos suporte e resistencias
+  plot(resistencia);
+  plot2(suporte);
+  plot3(Desv_suporte);
+  Plot4(Desv_resistencia);
+  // plot5(fvwap);
+  //===========================================================================================================================================================================//
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+    end;
+  //===========================================================================================================================================================================//
+  if close > (resistencia - fRangeDia) then
+    begin
+      bVendaResistencia := true;
+      bVendaDesvResistencia := true;
+    end
+  else if (close > resistencia) then
+    bVendaDesvResistencia := true;
+  //===========================================================================================================================================================================//
+  if close < (suporte + fRangeDia) then
+    begin
+      bCompraSuporte := true;
+      bCompraDesvSuporte := true;
+    end
+  else if close < suporte then
+    bCompraDesvSuporte := true;
+  //===========================================================================================================================================================================//
+  IF ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) THEN
+    begin
+      // Só reinicializa a entrada se não estiver controlando ordens stop.
+      if iEntradaStop = 0 then
+        Entrada := 0;
+      IF (B_Prox_v_Resistencia = true) and bVendaResistencia THEN
+        begin
+          iOperacao := VendaResistencia;
+          ENTRADA := resistencia;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - fDiferRes);
+        end
+      else if (B_Prox_C_Suporte = true) and bCompraSuporte then
+        BEGIN
+          iOperacao := compraSuporte;
+          ENTRADA := suporte;
+          STOP_LOSS := ENTRADA - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (ENTRADA + fDiferSup);
+        END
+      //===========================================================================================================================================================================//
+      else IF (B_Prox_v_Desv_Resistencia = true) and bVendaDesvResistencia THEN
+        begin
+          iOperacao := VendaDesvResistencia;
+          ENTRADA := Desv_resistencia;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - fDiferRes);
+        end
+      else if (B_Prox_C_Desv_Suporte = true) and bCompraDesvSuporte then
+        BEGIN
+          iOperacao := CompraDesvSuporte;
+          ENTRADA := Desv_suporte;
+          STOP_LOSS := ENTRADA - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (ENTRADA + fDiferSup);
+        END;
+      //=========================================================================================================================================================//
+      if (Entrada <> 0) then
+        begin
+          // Verificar se é compra ou venda.
+          if ((iOperacao = compraSuporte) OR (iOperacao = CompraDesvSuporte) OR ((iOperacao = VendaResistencia) OR (iOperacao = VendaDesvResistencia)) AND ContraEstrategia) then
+            begin
+              // Chegou em um rompimento comprador ou em um rompimento vendedor com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de compra, de acordo com o melhor preço de compra no book.
+              if (BidPrice >= Entrada) then
+                begin
+                  BuyLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (Entrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  BuyStop(Entrada,Entrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else 
+            begin
+              // Aqui é um rompimento vendedor ou um rompimento comprador com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+              if (AskPrice <= Entrada) then
+                begin
+                  SellShortLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (Entrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  SellShortStop(Entrada,Entrada);
+                  iEntradaStop := - 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+    end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsSold THEN
+        // TRAILING STOP DE VENDA
+        BEGIN
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS > SellPrice then
+                STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS < SellPrice then
+                STOP_LOSS := close + DistanciaPrecoPontos;
+            end;
+          //==> quantos ticks o preço andou
+          ////======================================================================================================================================//
+          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought THEN
+        BEGIN
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS < BuyPrice then
+                STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS > BuyPrice then
+                STOP_LOSS := Close - DistanciaPrecoPontos;
+            end;
+          ////======================================================================================================================================//
+          //==> quantos ticks o preço andou
+          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+            end;
+        END;
+      if ( Not HasPosition) then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    begin
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop((STOP_LOSS),Stop_Offset);
+      IF (high > STOP_LOSS) THEN
+        BuyToCoverAtMarket;
+    end;
+  //======================================================================================================================================//
+  IF IsBought then
+    begin
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,Stop_Offset);
+      IF (LOW < STOP_LOSS) or (close < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  ////======================================================================================================================================//
+  ////== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+  if not HasPosition and (iEntradaStop <> 0) and (Entrada <> 0) then
+    begin
+      // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(Entrada,Entrada)
+              else 
+                SellShortStop(Entrada,Entrada);
+            end;
+        end
+      else 
+        iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  if IsBought and Not JaContouOperacao THEN
+    // TRAINLING STOP DE VENDA
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  if IsSold and Not JaContouOperacao THEN
+    // TRAINLING STOP DE VENDA
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  //======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  //=========================================================================================================================================================//
+end;
+end;

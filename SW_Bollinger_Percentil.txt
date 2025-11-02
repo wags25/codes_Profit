@@ -1,0 +1,33 @@
+input
+  Media_Banda(50);
+  Desvio_Banda(2);
+  Media_Sinal(5);
+var
+  fBasis : float;
+  fDev   : float;
+  fUpper : float;
+  fLower : float;
+  fBbr   : float;
+  fMediaBB:float;
+begin
+  fBasis := media(media_banda,close);
+  fDev := Desvio_Banda * StdDevs(close,Media_Banda);
+  fUpper := fBasis + fDev;
+  fLower := fBasis - fDev;
+  if (currentbar > Media_Banda) then
+    begin
+      fBbr := (close - fLower) / (fUpper - fLower);
+    end;
+    fMediaBB:=Media(Media_Sinal,fbbr);
+  plot(fbbr);
+  plot2( fMEdiaBb);
+  Plot3(1.0);
+  Plot4(0.50);
+  Plot5(0.0);
+
+
+  if (fBbr < fMediaBB) and (fBbr > 0.80) then
+  paintbar(clred)
+  else if (fBbr > fMediaBB) and (fBbr < 0.20)  then
+  paintbar(clgreen);
+end;

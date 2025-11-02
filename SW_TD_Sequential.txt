@@ -1,0 +1,89 @@
+{var
+
+buySignal:float;
+
+begin
+buysignal:=0;
+if (close< close[4]) then
+
+begin
+ if buySignal[1]=9 then
+   buysignal:= 1
+   else
+   buysignal[1]:= buysignal[1] +1  ;
+end  
+else if (close > close[4]) then
+buySignal := 0; 
+
+
+
+
+  Plottext(buysignal[1],clwhite,2,10);
+end;
+     }
+
+{var
+buySignalsTemp:float;
+buysignals:float;
+begin
+//buysignals:=0;
+
+buySignalsTemp := 0;
+if (close < close[4]) then
+    if (buySignals[1] = 9) then
+    begin
+       // buySignalsTemp := 1;
+        paintbar(clmarrom);
+     end
+    else 
+        buySignalsTemp := buySignals[1] + 1
+    
+
+else 
+    buySignalsTemp := 0;
+
+buySignals := buySignalsTemp;
+
+plotText(buysignals,clwhite,2,10);
+end;
+  }
+
+var
+buySignalsTemp:float;
+buysignals:float;
+sellSignals:float;
+
+begin
+
+begin
+if Close < Close[4] then
+if buySignals[1] = 9 then
+begin
+paintbar(clblue);
+buySignals := 1;
+end
+else
+buySignals := buySignals[1] + 1
+
+else
+buySignals := 0;
+
+end;
+  // plotText(buysignals,clwhite,2,10);
+
+begin
+if Close > Close[4] then
+if sellSignals[1] = 9 then
+begin
+paintbar(clmarrom);
+sellSignals := 1 ;
+
+end
+else
+sellSignals := sellSignals[1] + 1
+
+else
+sellSignals := 0;
+end;
+//plotText(sellsignals,clwhite,0,10);
+end;

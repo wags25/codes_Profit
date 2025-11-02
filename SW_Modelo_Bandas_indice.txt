@@ -1,0 +1,136 @@
+CONST
+  DAYTRADE       = true;
+  HORAENTRADA    = 0900;
+  HORASAIDA      = 1710;
+  HORAFECHAMENTO = 1710;
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(True);
+  StopEmPontos(600);
+  AlvoEmPontos(260);
+  StopOffset(75);
+  Distancia(140);
+  QtdeMaxOperacoesNoDia(1);
+ 
+VAR
+  V_Pull,C_Pull                      : float;
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset : FLOAT;
+  B_prox_V_Pull,B_prox_C_Pull        : Boolean;
+  F_ProximidadeToqueTick             : float;
+  TrailingStopAtivado                : boolean;
+  FloorTraillingStop                 : float;
+  BreakevenAtivado                   : boolean;
+  bPullbackCompra,bPullbackVenda     : boolean;
+  QtdeOperacoesNoDia                 : integer;
+  DataAtual                          : integer;
+  JaContouOperacao                   : boolean;
+begin
+  // Verificar se é um novo dia.
+  if (Date > Date[1]) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      bPullbackCompra := false;
+      bPullbackVenda := false;
+      F_ProximidadeToqueTick := (10);
+    end;
+  //========================//
+  V_Pull := openD(0) + Distancia;
+  C_Pull := openD(0) - Distancia;
+  //=========================================================================================================================================================//
+  B_prox_V_Pull := (HIGH >= (V_Pull - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= (V_Pull + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  B_prox_C_Pull := (Low <= (C_Pull + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (Low >= (C_Pull - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  //=========================================================================================================================================================//
+  // Verificar se existe nova máxima.
+  if (Highd(0) > Highd(0)[1]) then
+    bPullbackCompra := true;
+  // Verificar se existe nova mínima.
+  if (Lowd(0) < Lowd(0)[1]) then
+    bPullbackVenda := true;
+  //=========================================================================================================================================================//
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+    end;
+  //=========================================================================================================================================================//
+  begin
+    if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) then
+      BEGIN
+        IF (B_prox_V_Pull) {AND bPullbackVenda}
+        THEN
+          begin
+            // PARÂMETROS DE ENTRADA E SAIDA
+            ENTRADA := V_Pull;
+            STOP_LOSS := entrada + StopEmPontos;
+            Stop_Offset := STOP_LOSS + StopOffset;
+            GAIN := (ENTRADA - AlvoEmPontos);
+            // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+            //if (AskPrice <= Entrada) then
+              SellShortLimit(Entrada);
+            {else if (low <= (Entrada + f_ProximidadeToqueTick * MinPriceIncrement)) then
+              // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+              SellShortStop(Entrada,Entrada); }
+          end
+        ELSE 
+          //=========================================================================================================================================================//
+          if B_prox_C_Pull {AND bPullbackCompra}
+          then
+            BEGIN
+              ENTRADA := C_Pull;
+              STOP_LOSS := ENTRADA - StopEmPontos;
+              Stop_Offset := STOP_LOSS - StopOffset;
+              GAIN := (ENTRADA + AlvoEmPontos);
+              //if (BidPrice >= Entrada) then
+                BuyLimit(Entrada) ;
+              {else if (high >= (Entrada - f_ProximidadeToqueTick * MinPriceIncrement)) then
+                // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                BuyStop(Entrada,Entrada); }
+            END;
+        //=========================================================================================================================================================//
+      end;
+    ////======================================================================================================================================//
+    IF IsSold THEN
+      begin
+        BuyToCoverLimit(GAIN);
+        BuyToCoverStop((STOP_LOSS),Stop_Offset);
+        IF (high > STOP_LOSS) THEN
+          BuyToCoverAtMarket;
+      end;
+    IF IsBought then
+      begin
+        SellToCoverLimit(Gain);
+        SellToCoverStop(STOP_LOSS,Stop_Offset);
+        IF (LOW < STOP_LOSS) or (close < STOP_LOSS) THEN
+          SellToCoverAtMarket;
+      end;
+    //=========================================================================================================================================================//
+    if isSold and Not JaContouOperacao THEN
+      // TRAINLING STOP DE VENDA
+      begin
+        { contabiliza a abertura da posição}
+        QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+        JaContouOperacao := true;
+      end;
+    if isbought and Not JaContouOperacao THEN
+      // TRAINLING STOP DE VENDA
+      begin
+        { contabiliza a abertura da posição}
+        QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+        JaContouOperacao := true;
+      end;
+  END;
+  //=========================================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DayTrade) AND (Time >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  Plot(C_Pull);
+  Plot2(V_Pull);
+  plot3(OPend(0));
+end;
+//=========================================================================================================================================================//
+//=========================================================================================================================================================//
+end;

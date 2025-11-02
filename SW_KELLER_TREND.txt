@@ -1,0 +1,37 @@
+input
+
+Keller_21_34(false);
+Keller_5_13(false);
+Keller_1_5(true);
+
+var
+
+diferencialMedia:float;
+
+begin
+
+if Keller_21_34 = true and  (Keller_1_5 = false) and (Keller_5_13 = false) then 
+begin  
+diferencialMedia:= MediaExp(21,close) - MediaExp(34,close);
+SetPlotColor(1,rgb(255,140,0));
+plot(diferencialMedia);   
+
+end; 
+ if  (Keller_21_34 = false) and (Keller_5_13 = true)  and (Keller_1_5 = false)  then 
+begin  
+diferencialMedia:= MediaExp(5,close) - MediaExp(13,close);
+SetPlotColor(1,rgb(128,0,0)); 
+plot(diferencialMedia); 
+end;
+
+ if  (Keller_21_34 = false) and (Keller_5_13 = false)  and (Keller_1_5 = true)  then 
+begin  
+diferencialMedia:= MediaExp(1,close) - MediaExp(5,close);
+SetPlotColor(1,rgb(65,105,255)); 
+plot(diferencialMedia); 
+end; 
+
+
+ 
+SetPlotType(1,1);
+end;

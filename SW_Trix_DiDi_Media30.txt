@@ -1,0 +1,214 @@
+CONST
+  DAYTRADE       = FALSE;
+  HORAENTRADA    = 0901;
+  HORASAIDA      = 1710;
+  HORAFECHAMENTO = 1720;
+input
+  MediaRef(8);
+  Media1(3);
+  Media2(20);
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(True);
+  StopEmPontos(5);
+  StopOffset(10);
+  AlvoEmPontos(77);
+  BreakevenEmPontos(7);
+  DistanciaEntradaPontos(0.5);
+  TraillingStopTrigger(13);
+  DistanciaPrecoPontos(7);
+  DistUltPreco(7);
+  FrequenciaAjuste(3);
+  respiro(0);
+  QtdeMaxOperacoesNoDia(3);
+var
+  STOCH14,STOCH9,STOCH20,Trixx,Media_trix : FLOAT;
+  COND1V,COND1C                           : BOOLEAN;
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset      : FLOAT;
+  MM30,MM15                               : FLOAT;
+  TrailingStopAtivado                     : boolean;
+  FloorTraillingStop                      : float;
+  BreakevenAtivado                        : boolean;
+  mm,mc,ml                                : real;
+  iac,iav,icc,icv                         : inteiro;
+  ac,av,cc,cv                             : booleano;
+  QtdeOperacoesNoDia                      : integer;
+  DataAtual                               : integer;
+  JaContouOperacao                        : boolean;
+begin
+  // PARAMETROS DA CONDIÇÃO DE VENDA
+  MM15 := Media(3,close);
+  MM30 := Media(30,close);
+  STOCH14 := SlowStochastic(14);
+  STOCH9 := SlowStochastic(9);
+  STOCH20 := SlowStochastic(20);
+  Trixx := Trix(7,1);
+  Media_trix := Media(4,trixx);
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+    end;
+  ///=================================================================================================================================================================================================///
+  mm := Media(MediaRef,close);
+  mc := (Media(Media1,close) - mm);
+  ml := (Media(Media2,close) - mm);
+  Se (mc[1] < 0) e (mc > 0) entao
+    iac := 1
+  senao 
+    iac := 0;
+  Se (mc[1] > 0) e (mc < 0) entao
+    iav := 1
+  senao 
+    iav := 0;
+  ac := (Summation(iac,2) >= 1);
+  av := (Summation(iav,2) >= 1);
+  cc := ac e (mc[1] < ml[1]) e (mc > ml);
+  cv := av e (mc[1] > ml[1]) e (mc < ml);
+  ///=================================================================================================================================================================================================///
+  // CONDICIONAIS VENDA
+  COND1V := (Trixx < Media_Trix) and av e (mc[1] > ml[1]) e (mc < ml);
+  COND1C := (Trixx > Media_Trix) and ac e (mc[1] < ml[1]) e (mc > ml);
+  ///=================================================================================================================================================================================================///
+  BEGIN
+    IF ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) THEN
+      begin
+        if COND1V THEN
+          BEGIN
+            // PARÂMETROS DE ENTRADA E SAIDA
+            ENTRADA := low;
+            STOP_LOSS := entrada + StopEmPontos;
+            GAIN := (ENTRADA - AlvoEmPontos);
+            SellShortLimit(ENTRADA);
+          END;
+      end;
+    ////======================================================================================================================================//
+    if ModuloAutomacao then
+      BEGIN
+        IF IsSold then
+          BEGIN
+            { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+            if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+              begin
+                BreakevenAtivado := true;
+                if STOP_LOSS > SellPrice then
+                  STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+              end;
+            ////======================================================================================================================================//
+            /// Parâmetros de trailing Stop
+            if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+              begin
+                TrailingStopAtivado := True;
+                if STOP_LOSS < SellPrice then
+                  STOP_LOSS := close + DistanciaPrecoPontos;
+              end;
+            //==> quantos ticks o preço andou
+            ////======================================================================================================================================//
+            FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+            if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+              begin
+                STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+              end;
+          END
+        else if ( Not HasPosition) then
+          begin
+            // Resetar as variáveis de controle do breakeven e do trailing stop.
+            BreakevenAtivado := false;
+            TrailingStopAtivado := false;
+          end;
+      END;
+    if isSold and Not JaContouOperacao THEN
+      // TRAINLING STOP DE VENDA
+      begin
+        { contabiliza a abertura da posição}
+        QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+        JaContouOperacao := true;
+      end;
+    ////======================================================================================================================================//
+    IF IsSold THEN
+      BEGIN
+        BuyToCoverLimit(GAIN);
+        BuyToCoverStop(STOP_LOSS,STOP_LOSS + stopOffset);
+        IF (high > STOP_LOSS) THEN
+          BuyToCoverAtMarket;
+      END;
+  END;
+  {FECHAR TODAS POSIÇOES AM ABERTO}
+  IF (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    CLOSEPOSITION;
+  if Not IsBought and Not isSold and JaContouOperacao then
+    JaContouOperacao := false;
+  ////======================================================================================================================================//
+  ////======================================================================================================================================//
+  ////======================================================================================================================================//
+  BEGIN
+    IF ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) THEN
+      begin
+        if COND1C THEN
+          begin
+            // PARÂMETROS DE ENTRADA E SAIDA
+            ENTRADA := High;
+            STOP_LOSS := entrada - StopEmPontos;
+            GAIN := (ENTRADA + AlvoEmPontos);
+            BuyLimit(ENTRADA);
+          end;
+      end;
+    ////======================================================================================================================================//
+    if ModuloAutomacao then
+      BEGIN
+        IF IsBought then
+          BEGIN
+            { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+            if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+              begin
+                BreakevenAtivado := true;
+                if STOP_LOSS < BuyPrice then
+                  STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+              end;
+            ////======================================================================================================================================//
+            /// Parâmetros de trailing Stop
+            if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+              begin
+                TrailingStopAtivado := True;
+                if STOP_LOSS > BuyPrice then
+                  STOP_LOSS := Close - DistanciaPrecoPontos;
+              end;
+            ////======================================================================================================================================//
+            //==> quantos ticks o preço andou
+            FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+            if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+              begin
+                STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+              end;
+          END
+        else if ( Not HasPosition) then
+          begin
+            // Resetar as variáveis de controle do breakeven e do trailing stop.
+            BreakevenAtivado := false;
+            TrailingStopAtivado := false;
+          end;
+      END;
+    if isbought and Not JaContouOperacao THEN
+      // TRAINLING STOP DE VENDA
+      begin
+        { contabiliza a abertura da posição}
+        QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+        JaContouOperacao := true;
+      end;
+    ////======================================================================================================================================//
+    IF IsBought then
+      SellToCoverLimit(Gain);
+    SellToCoverStop(STOP_LOSS,STOP_LOSS - stopOffset);
+    begin
+      IF (LOW < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  END;
+  ////======================================================================================================================================//
+  {FECHAR TODAS POSIÇOES AM ABERTO}
+  IF (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    CLOSEPOSITION;
+  if Not IsBought and Not isSold and JaContouOperacao then
+    JaContouOperacao := false;
+end;

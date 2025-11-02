@@ -1,0 +1,177 @@
+var
+  fAdx,fDip,fDim                                            : float;
+  MediaAdx,fDidi20,fDidi03                                  : float;
+  fMediaDidiPos,fMediaDidiNeg                               : float;
+  ftrix,fMediaTrix,fStocastico,fMediaStoch                  : float;
+  basis,dev,upper,lower                                     : float;
+  mult                                                      : float;
+  deltaBJmin,deltaBJmax                                     : float;
+  barNeedleCompra,barNeedleVenda                            : float;
+  //==============================================================//
+  bCompraTrix,bCompraStocastic                              : boolean;
+  bVendaTrix,bVendaStocastic                                : boolean;
+  bbOpenUp,bbOpenDown,bbParallelUP,bbParallelDown,bbClose   : boolean;
+  bDownTrend,bUpTrend,bDidiVenda,bDidiCompra                : Boolean;
+  bAdxSubinte,bAdxCainte                                    : Boolean;
+  longaUp,longaNeutral,longaDown,curtaUp,curtaDown          : boolean;
+  alertaCompra,alertaVenda,confirmaCompra,confirmaVenda     : boolean;
+  alertVendaF,alertCompraF,alertVendaFC,alertCompraFC       : boolean;
+  bcompraFalsa,bVendaFalsa                                  : boolean;
+  bdidiComprado,bagulhadaCompra,bagulhadaVenda,bdidiVendido : boolean;
+  bjCompraMax,bjCompraMin,bjCompra                          : Boolean;
+  bjVendaMax,bjVendaMin,bjVenda                             : Boolean;
+  bAdxTrendUpStrong,bAdxTrendUp                             : boolean;
+  badxTrendUpCainte,badxTrendDown,badxTrendDownStrong       : boolean;
+  badxTrendDownFalling,badxKick                             : boolean;
+  //==============================================================//
+  barConfirmaVenda,barAlertaVenda                           : integer;
+  barConfirmaCompra,barAlertaCompra                         : integer;
+  iContador                                                 : integer;
+  DataAtual,delta                                           : integer;
+begin
+  // Verificar se é um novo dia.
+  if (Date > Date[1]) then
+    begin
+      DataAtual := Date;
+      // Inicializar as variáveis de controle diárias.
+      iContador := 0;
+      delta := 3;
+      deltaBJmin := 0.02;
+      deltaBJmax := 0.05;
+    end;
+  //=====================================================//
+  mult := 2;
+  // BB CALCULATIONS //
+  basis := media(8,close);
+  dev := mult * StdDevs(close,8);
+  upper := basis + dev;
+  lower := basis - dev;
+  //=====================================================//
+  bbOpenUp := (upper > upper[1]) and (lower < lower[1]) and (basis > basis[1]);
+  bbOpenDown := (upper > upper[1]) and (lower < lower[1]) and (basis < basis[1]);
+  bbParallelUp := (upper > upper[1]) and (lower > lower[1]) or (lower = lower[1]);
+  bbParallelDown := (upper < upper[1]) or (upper = upper[1]) and (lower < lower[1]);
+  bbClose := (upper <= upper[1]) and (lower >= lower[1]);
+  //=====================================================//
+  begin
+    // Cálculo dos indicadores ADX e DMI
+    // Direcional positivo
+    fDip := DiPDiM(8)|0|;
+    // Direcional negativo
+    fDim := DiPDiM(8)|1|;
+    // ADX com período 8
+    fAdx := ADX(8,8);
+    // Média móvel de 3 períodos do ADX
+    MediaAdx := Media(3,fAdx);
+    bAdxSubinte := fadx > MediaAdx;
+    bAdxCainte := fAdx < MediaAdx;
+    bAdxTrendUp := (fDip > fDim) and (bAdxSubinte) and (fAdx < 32) and (fadx > fDim);
+    bAdxTrendUpStrong := (fDip > fDim) and (bAdxSubinte) and (fAdx >= 32);
+    badxTrendUpCainte := (fDip > fDim) and (bAdxCainte) and (fAdx >= 32);
+    //=====================================================//
+    badxTrendDown := (fDim > fDip) and (bAdxSubinte) and (fAdx < 32) and (fadx > fDip);
+    badxTrendDownStrong := (fDim > fDip) and (bAdxSubinte) and (fAdx >= 32);
+    badxTrendDownFalling := (fDim > fDip) and (bAdxCainte) and (fAdx >= 32);
+    //=====================================================//
+    badxKick := (bAdxCainte) and (fadx[1] >= fadx[2]) and (fadx > 32);
+    //=====================================================//
+    fTrix := TRIX(7,0);
+    fMediaTrix := (Media(4,fTrix));
+    fStocastico := FullStochastic(14,3,0);
+    fMediaStoch := media(3,fStocastico);
+    //=====================================================//
+    // Verificação trix e stocastico
+    bCompraTrix := fTrix > fMediaTrix;
+    bVendaTrix := fTrix < fMediaTrix;
+    bCompraStocastic := fStocastico > fMediaStoch;
+    bVendaStocastic := fStocastico < fMediaStoch;
+  end;
+  //======================================================================================================================================================//
+  begin
+    // Cálculo do índice Didi
+    // Índice Didi negativo
+    fDidi20 := DidiIndex(8,0,3,0,20,0)|1|;
+    // Índice Didi positivo
+    fDidi03 := DidiIndex(8,0,3,0,20,0)|0|;
+    // Cálculo das médias móveis dos índices Didi
+    fMediaDidiPos := Media(3,fDidi03);
+    fMediaDidiNeg := Media(3,fDidi20);
+    //===========================================================//
+    // Didi Index \\
+    // Alerts
+    longaUp := fDidi20 > fDidi20[1];
+    longaNeutral := fDidi20 = fDidi20[1];
+    longaDown := fDidi20 < fDidi20[1];
+    curtaUp := fDidi03 > fDidi03[1];
+    curtaDown := fDidi03 < fDidi03[1];
+    //===========================================================//
+    alertaCompra := (fDidi03[1] < 0) and (fDidi03 > 0);
+    alertaVenda := (fDidi03[1] > 0) and (fDidi03 < 0);
+    confirmaCompra := (fDidi20[1] < 0) and (fDidi20 < 0);
+    confirmaVenda := (fDidi20[1] > 0) and (fDidi20 > 0);
+    //===========================================================//
+    alertVendaF := alertaVenda and (fDidi20 < 0) and longaUp;
+    alertCompraF := alertaCompra and (fDidi20 > 0) and longaDown;
+    alertVendaFC := (fDidi20 < 0) and (longaUp) and (fDidi03 < 0);
+    alertCompraFC := (fDidi20 > 0) and (longaDown) and (fDidi03 < 0);
+    //===========================================================//
+    // Fake long and short
+    bcompraFalsa := alertaCompra and (longaUp) and (fDidi20 > fDidi03);
+    bvendaFalsa := alertaVenda and (longaDown) and (fDidi20 < fDidi03);
+    //===========================================================//
+    // Condições de agulha
+    barAlertaCompra := 0;
+    // Inicializando as variáveis
+    barConfirmaCompra := 0;
+    barAlertaVenda := 0;
+    barConfirmaVenda := 0;
+    // Contagem de barras desde o último alerta ou confirmação
+    if alertaCompra then
+      barAlertaCompra := 0
+    else 
+      barAlertaCompra := barAlertaCompra + 1;
+    if confirmaCompra then
+      barConfirmaCompra := 0
+    else 
+      barConfirmaCompra := barConfirmaCompra + 1;
+    if alertaVenda then
+      barAlertaVenda := 0
+    else 
+      barAlertaVenda := barAlertaVenda + 1;
+    if confirmaVenda then
+      barConfirmaVenda := 0
+    else 
+      barConfirmaVenda := barConfirmaVenda + 1;
+    //===========================================================//
+    barNeedleCompra := barAlertaCompra + barConfirmaCompra + 1;
+    barNeedleVenda := barAlertaVenda + barConfirmaVenda + 1;
+    // Direction of needles
+    bdidiComprado := (fDidi03 > 0) and (fDidi20 < 0);
+    bdidiVendido := (fDidi03 < 0) and (fDidi20 > 0);
+    // Needles
+    bagulhadaCompra := (barNeedleCompra <= delta) and (barNeedleCompra >= 0);
+    bagulhadaVenda := (barNeedleVenda <= delta) and (barNeedleVenda >= 0);
+    //===========================================================//
+    // BJMA: Condições de compra
+    bjCompraMax := bdidiComprado and (bdidiComprado[1] = true) and curtaUp and longaDown and (fDidi03 <= deltaBJmax) and (fDidi20 >= deltaBJmax - deltaBJmax * 2);
+    bjCompraMin := bdidiComprado and (bdidiComprado[1] = true) and curtaUp and longaDown and (fDidi03[1] <= deltaBJmin) and (fDidi20[1] >= deltaBJmin - deltaBJmin * 2);
+    bjCompra := bjCompraMax and bjCompraMin;
+    // BJMA: Condições de venda
+    bjVendaMax := bdidiVendido and (bdidiVendido[1] = true) and longaUp and curtaDown and (fDidi20 <= deltaBJmax) and (fDidi03 >= deltaBJmax - deltaBJmax * 2);
+    bjVendaMin := bdidiVendido and (bdidiVendido[1] = true) and longaUp and curtaDown and (fDidi20[1] <= deltaBJmin) and (fDidi03[1] >= deltaBJmin - deltaBJmin * 2);
+    bjVenda := bjVendaMax and bjVendaMin;
+  end;
+  //======================================================================================================================================================//
+  begin
+    if (bbOpenUp or bbParallelUp) and (badxTrendUp or badxTrendUpStrong or badxTrendUpCainte) and bagulhadaCompra and ((bagulhadaCompra[1] = false) and (bdidiComprado[1] = false)) then
+      begin
+        paintbar(clyellow);
+        select;
+      end;
+    if (bbOpenUp or bbParallelUp) and (badxTrendUp or badxTrendUpStrong or badxTrendUpCainte) and (alertCompraF or alertCompraFC) then
+      paintbar(clblue);
+    if (bbOpenUp or bbParallelUp) and (badxTrendUp or badxTrendUpStrong or badxTrendUpCainte) and bdidiComprado then
+      paintbar(clgreen);
+    //if (bbOpenUp or bbParallelUp) and (badxTrendUp or badxTrendUpStrong or badxTrendUpCainte) and bjCompra and ((bjCompra[1] = false) and (bagulhadaCompra[1] = false)) then
+  end;
+end;

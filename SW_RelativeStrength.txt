@@ -1,0 +1,50 @@
+const
+  wdo  = asset("wdofut", FeedBMF);
+  WIN  = asset("WINFUT", FeedBMF);
+  ibov = asset("IBOV", feedBovespa);
+
+input
+  Ticker("IBOV", feedBMf);
+  periodo(126);
+
+var
+  fastrs, fRelativeStrength: float;
+  R, RM, D: float;
+  nIndex: integer;
+
+begin
+  nIndex := 0;
+  R := 0;
+  RM := 0;
+  D := 0;
+
+  //================================================================================================================//
+  if (CurrentBar > periodo) then
+    for nIndex := 1 to (periodo) do
+    begin
+      // Verifica se os valores de close são diferentes de zero antes de dividir
+      if (close[nindex] <> 0) and (close[nindex - 1] <> 0) and
+         (ticker.close[nindex] <> 0) and (ticker.close[nindex - 1] <> 0) then
+      begin
+        R := R + ((((close[nindex - 1] / close[nindex]) / 
+                    (ticker.close[nindex - 1] / ticker.close[nindex])) - 1) * 100);
+      end;
+    end;
+    
+  fastrs := (R / periodo);
+
+  //================================================================================================================//
+  fRelativeStrength := fastrs * 100;
+  plot(fRelativeStrength);
+
+  if fRelativeStrength > 0 then
+  begin
+    SetPlotColor(1, clgreen);
+    paintbar(clgreen);
+  end
+  else 
+  begin
+    SetPlotColor(1, clred);
+    paintbar(clred);
+  end;
+end;

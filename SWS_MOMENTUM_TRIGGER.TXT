@@ -1,0 +1,241 @@
+var
+  ACGS,AVB,STOCH14,STOCH9,STOCH20,ZSCORE                      : FLOAT;
+  bCond1V,bCond2V,bCond3V,bCond4V,bCond5V,bCond6V             : boolean;
+  bCond1VD,bCond2VD,bCond3VD,bCond4VD,bCond5VD,bCond6VD       : boolean;
+  bCond1C,bCond2C,bCond3C,bCond4C,bCond5C,bCond6C             : BOOLEAN;
+  bCond1CD,bCond2CD,bCond3CD,bCond4CD,bCond5CD,bCond6CD       : BOOLEAN;
+  //==========================================================//
+  bCond1VR,bCond2VR,bCond3VR,bCond4VR,bCond5VR,bCond6VR       : boolean;
+  bCond1CR,bCond2CR,bCond3CR,bCond4CR,bCond5CR,bCond6CR       : BOOLEAN;
+  bCond1VRD,bCond2VRD,bCond3VRD,bCond4VRD,bCond5VRD,bCond6VRD : boolean;
+  bCond1CRD,bCond2CRD,bCond3CRD,bCond4CRD,bCond5CRD,bCond6CRD : BOOLEAN;
+  //==========================================================//
+  STOP_LOSS,ENTRADA,GAIN,R                                    : FLOAT;
+  MME6,MME8,MME20,MME5                                        : FLOAT;
+  vencimento                                                  : Integer;
+  sSum,sFactor                                                : Float;
+  bDetectorSell,bDetectorBuy                                  : boolean;
+begin
+  //==============================================//
+  Vencimento := 1260202;
+  //==================================================//
+  // PARAMETROS DA bCondIÇÃO DE VENDA
+  bDetectorSell := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|0|) >= 1;
+  bDetectorBuy := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|0|) <= - 1;
+  ACGS := AccAgressSaldo(1);
+  AVB := AgressionVolBalance;
+  MME5 := MEDIAEXP(5,CLOSE);
+  MME6 := MEDIAEXP(6,CLOSE);
+  MME8 := MediaExp(8,CLOSE);
+  MME20 := MediaExp(20,CLOSE);
+  STOCH14 := SlowStochastic(14);
+  STOCH9 := SlowStochastic(9);
+  STOCH20 := SlowStochastic(20);
+  // plot((DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|0|));
+  { PRIMEIRA PARTE É A PARTE PARA CANDLE}
+  ///=================================================================================================================================================================================================///
+  // bCondICIONAIS VENDA
+  bCond1V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond2V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond3V := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond6V := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME5) AND (HIGH > MME8) AND (HIGH > MME20);
+  ///=================================================================================================================================================================================================///
+  bCond1VD := (AVB > 0) AND (CLOSE > OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond2VD := (AVB > 0) AND (CLOSE > OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond3VD := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE > OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond4VD := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond5VD := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE > OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  { bCond3V := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);
+  bCond4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);
+  bCond5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);}
+  ///=================================================================================================================================================================================================///
+  ///=================================================================================================================================================================================================///
+  /// bCondICIONAIS DE COMPRA
+  bCond1C := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20);
+  bCond2C := (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20);
+  bCond3C := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond4C := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond5C := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond6C := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  ///=================================================================================================================================================================================================///
+  bCond1CD := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond2CD := (AVB < 0) AND (CLOSE < OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond3CD := (ACGS < 0) AND (AVB > 0) AND (CLOSE < OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond4CD := (ACGS < 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond5CD := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  bCond6CD := (ACGS > 0) AND (AVB > 0) AND (CLOSE < OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20) and (bDetectorBuy = true);
+  {bCond3C := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  bCond4C := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  bCond5C := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  bCond6C := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20); }
+  ///=================================================================================================================================================================================================///
+  { SEGUNDA PARTE É A DO RENKO}
+  ///=================================================================================================================================================================================================///
+  //// bCondICIONAIS VENDA
+  bCond1VR := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond2VR := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and (bDetectorSell = true);
+  bCond3VR := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond4VR := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond5VR := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and (bDetectorSell = true);
+  bCond6VR := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (bDetectorSell = true);
+  /// bCondICIONAIS DE COMPRA
+  bCond1CR := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) and (bDetectorBuy = true);
+  bCond2CR := (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (bDetectorBuy = true);
+  bCond3CR := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (bDetectorBuy = true);
+  bCond4CR := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (bDetectorBuy = true);
+  bCond5CR := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (bDetectorBuy = true);
+  bCond6CR := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (bDetectorBuy = true);
+  ///=================================================================================================================================================================================================///
+  ///=================================================================================================================================================================================================///
+  begin
+    IF (ISBMF) THEN
+      begin
+        // altera a data 20/08/10
+        if (CurrentDate <= Vencimento) then
+          begin
+            if bCond1V OR bCond2V OR bCond3V OR bCond4V OR bCond5V OR bCond6V THEN
+              begin
+                plotText(low,clwhite,2,10);
+                paintbar(rgb(0,0,255));
+              end;
+            ///=======================================//
+            if bCond1C OR bCond2C OR bCond3C OR bCond4C OR bCond5C OR bCond6C THEN
+              BEGIN
+                plotText(high,clwhite,2,10);
+                paintbar(rgb(255,255,0));
+                //yellow
+              end;
+            ///=======================================//
+            if bCond1VD OR bCond2VD OR bCond3VD OR bCond4VD OR bCond5VD OR bCond6VD THEN
+              begin
+                plotText(low,clwhite,0,10);
+                paintbar(rgb(0,0,255));
+              end;
+            if bCond1CD OR bCond2CD OR bCond3CD OR bCond4CD OR bCond5CD OR bCond6CD THEN
+              BEGIN
+                plotText(HIGH,clwhite,2,10);
+                paintbar(rgb(255,255,0));
+              end;
+          end;
+      end;
+  end;
+  ///=================================================================================================================================================================================================///
+  ///=================================================================================================================================================================================================///
+  begin
+    IF (ISBMF) and (bartype = - 1) THEN
+      begin
+        // altera a data 20/08/10
+        if (CurrentDate <= Vencimento) then
+          begin
+            if bCond1VR OR bCond2VR OR bCond3VR OR bCond4VR OR bCond5VR OR bCond6VR THEN
+              begin
+                plotText(low,clwhite,0,10);
+                paintbar(rgb(0,0,255));
+              end
+            ELSE if bCond1CR OR bCond2CR OR bCond3CR OR bCond4CR OR bCond5CR OR bCond6CR THEN
+              BEGIN
+                plotText(HIGH,clwhite,2,10);
+                paintbar(rgb(255,255,0));
+              end;
+          end;
+      end;
+  end;
+  ///=================================================================================================================================================================================================///
+end;
+{{PRIMEIRA PARTE  É DE VENDA}
+{ begin
+IF (ISBMF) THEN
+begin
+Vencimento := 1230302;
+// altera a data 20/08/10
+if (CurrentDate <= Vencimento) then
+begin
+if bCond1V OR bCond2V THEN
+begin
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+end;
+{  if bCond2V THEN
+//and ( nres >= 1.55)then
+begin
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+END;}
+{     IF (SlowStochastic(14) >= 75) THEN
+BEGIN
+//venda
+if bCond3V OR bCond4V OR bCond5V OR bCond6V THEN
+begin
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+end;
+{ if bCond4V then
+begin
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+end;
+if bCond5V then
+begin
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+end;
+if bCond6V THEN
+BEGIN
+plotText(low,clwhite,0,10);
+paintbar(rgb(0,0,205));
+end;
+END;
+END;
+END;
+END;
+{SEGUNDA PARTE É A DE COMPRA}
+{ begin
+IF (ISBMF) THEN
+begin
+Vencimento := 1230302;
+// altera a data 20/08/10
+if (CurrentDate <= Vencimento) then
+begin
+if bCond1C OR bCond2C THEN
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end;
+{  if bCond2C THEN
+//and ( nres >= 1.55)then
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end; }
+{       IF (SlowStochastic(14) <= 20) THEN
+BEGIN
+if bCond3C OR bCond4C OR bCond5C OR bCond6C THEN
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end;
+{    if bCond4C then
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end;
+if bCond5C then
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end;
+if bCond6C THEN
+BEGIN
+plotText(HIGH,clwhite,2,10);
+paintbar(rgb(255,255,0));
+end;
+END;
+END;
+END;
+END;
+END;
+
+
+}

@@ -1,0 +1,86 @@
+INPUT
+  PriceSource(close);
+  SetupBars(9);
+  CntdwnBars(13);
+  SetupLookback(3);
+  CntdwnLookback(2);
+  SetupPerfLookback(3);
+
+VAR
+  setupCountUp : integer;
+  setupCountDown : integer;
+  cntdwnCountUp : integer;
+  cntdwnCountDown : integer;
+  setupSell : float;
+  setupBuy : float;
+  setupSellPerfPrice : float;
+  setupBuyPerfPrice : float;
+
+begin
+  // Lógica do Setup (TD Setup)
+  if PriceSource > PriceSource[SetupLookback] then
+    setupCountUp := setupCountUp[1] + 1
+  else
+    setupCountUp := 0;
+
+  if PriceSource < PriceSource[SetupLookback] then
+    setupCountDown := setupCountDown[1] + 1
+  else
+    setupCountDown := 0;
+
+  // Plotando Setup de Venda (Setup Sell)
+  if setupCountUp = SetupBars then
+  begin
+    setupSell := PriceSource;  // Captura o preço do Setup de Venda
+    PaintBar(clRed);  // Barra vermelha para setups de venda
+    PlotText("Sell Setup", clRed, 0,15, High);  // Texto indicando Setup de Venda
+  end;
+
+  // Plotando Setup de Compra (Setup Buy)
+  if setupCountDown = SetupBars then
+  begin
+    setupBuy := PriceSource;  // Captura o preço do Setup de Compra
+    PaintBar(clGreen);  // Barra verde para setups de compra
+    PlotText("BUY Setup", clgreen, 0,15, LOW);  // Texto indicando Setup de Venda
+  end;
+
+  // Verificando o Setup de Venda Perfeito (Perfected Sell Setup)
+  if setupCountUp = SetupBars then
+  begin
+    setupSellPerfPrice := high[SetupPerfLookback];
+    if high >= setupSellPerfPrice then
+    begin
+      PaintBar(rgb(0,0,255));  // Barra amarela para Setup de Venda Perfeito
+       PlotText("Sell Perfect", clRed, 0,15, High);  // Texto indicando Setup de Venda
+    end;
+  end;
+
+  // Verificando o Setup de Compra Perfeito (Perfected Buy Setup)
+  if setupCountDown = SetupBars then
+  begin
+    setupBuyPerfPrice := low[SetupPerfLookback];
+    if low <= setupBuyPerfPrice then
+    begin
+      PaintBar(rgb(255,255,0));  // Barra azul para Setup de Compra Perfeito
+       PlotText("Buy Perfect", clgreen, 0,15, low);  // Texto indicando Setup de Venda
+    end;
+  end;
+
+  // Lógica do Countdown (Contagem Regressiva)
+  if PriceSource >= high[CntdwnLookback] then
+    cntdwnCountUp := cntdwnCountUp[1] + 1
+  else
+    cntdwnCountUp := 0;
+
+  if PriceSource <= low[CntdwnLookback] then
+    cntdwnCountDown := cntdwnCountDown[1] + 1
+  else
+    cntdwnCountDown := 0;
+
+  // Plotando Countdowns
+  if cntdwnCountUp = CntdwnBars then
+    PaintBar(clRed);  // Barra vermelha para countdown de venda
+
+  if cntdwnCountDown = CntdwnBars then
+    PaintBar(clGreen);  // Barra verde para countdown de compra
+end;

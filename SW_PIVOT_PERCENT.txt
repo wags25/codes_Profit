@@ -1,0 +1,422 @@
+CONST
+  DAYTRADE        = true;
+  HORAENTRADA     = 0900;
+  HORASAIDA       = 1710;
+  HORAFECHAMENTO  = 1730;
+  //DiasPlot        = 1;
+  //=======================/
+  Compra_Pivot_N1 = 1;
+  Venda_Pivot_P1  = - 1;
+  Compra_Pivot_N2 = 2;
+  Venda_Pivot_P2  = - 2;
+  Compra_Pivot_N3 = 3;
+  Venda_Pivot_P3  = - 3;
+  //=======================/
+  { StopEmPontos=5;
+  PrecoStopOffset=10;
+  AlvoEmPontos=77;
+  BreakevenEmPontos=7;
+  DistanciaEntradaPontos=0.5;
+  TraillingStopTrigger=13;
+  DistanciaPrecoPontos=7;
+  DistUltPreco=7;
+  FrequenciaAjuste=3;
+  respiro=0; }
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(true);
+  StopEmPontos(7);
+  stopOffset(10);
+  AlvoEmPontos(77);
+  BreakevenEmPontos(7);
+  DistanciaEntradaPontos(0.5);
+  TraillingStopTrigger(11);
+  DistanciaPrecoPontos(8);
+  DistUltPreco(8);
+  FrequenciaAjuste(3);
+  respiro(1);
+  DiasPlot(3);
+  ContraEstrategia(false);
+VAR
+  fPivotP1,fPivotP2,fPivotP3,fPivotN1,fPivotN2,fPivotN3                                     : float;
+  //=====================================================================================================//
+  bVendaPivotP6,bVendaPivotP5,bVendaPivotP4,bVendaPivotP3,bVendaPivotP2,bVendaPivotP1       : Boolean;
+  bCompraPivotP6,bCompraPivotP5,bCompraPivotP4,bCompraPivotN3,bCompraPivotN2,bCompraPivotN1 : Boolean;
+  //=====================================================================================================//
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset                                                        : FLOAT;
+  //=====================================================================================================//
+  B_prox_V_PivotP1,B_prox_V_PivotP2                                                         : Boolean;
+  B_prox_V_PivotP3,B_prox_V_PivotP4                                                         : boolean;
+  B_prox_V_PivotP5,B_prox_V_PivotP6                                                         : Boolean;
+  //=====================================================================================================//
+  B_prox_C_PivotN1,B_prox_C_PivotN2                                                         : Boolean;
+  B_prox_C_PivotN3,B_prox_C_PivotP4                                                         : boolean;
+  B_prox_C_PivotP5,B_Prox_C_PivotP6                                                         : Boolean;
+  //====================================================================================================//
+  F_ProximidadeToqueTick                                                                    : float;
+  TrailingStopAtivado                                                                       : boolean;
+  FloorTraillingStop                                                                        : float;
+  BreakevenAtivado                                                                          : boolean;
+  iOperacao                                                                                 : integer;
+  iNroCandlesOrdem,iEntradaStop                                                             : integer;
+  iBarControleStop                                                                          : integer;
+  DP,D,RM,r                                                                                 : Float;
+  nIndex                                                                                    : integer;
+  Periodo                                                                                   : integer;
+  fRM21_15Percent                                                                           : float;
+  hv                                                                                        : float;
+  pivot                                                                                     : float;
+  lhvar,llvar,lcvar                                                                         : float;
+  lDev                                                                                      : float;
+  devP1,devP2,devP3                                                                         : float;
+  devN1,devN2,devN3                                                                         : float;
+  //====================================================================================================//
+begin
+  // Verificar se é um novo dia.
+  if (Date > Date[1]) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      F_ProximidadeToqueTick := (4);
+      //entrada := 0;
+      //===================================//
+      B_prox_C_PivotN1 := false;
+      B_prox_C_PivotN2 := false;
+      B_prox_C_PivotN3 := false;
+      //===================================//
+      B_prox_V_PivotP1 := false;
+      B_prox_V_PivotP2 := false;
+      B_prox_V_PivotP3 := false;
+      //===================================//
+      // iOperacao irá controlar qual a entrada foi efetuada a fim de ser possivel desabilitar nova entrada no mesmo ponto antes de ocorrer uma nova habilitação desse ponto.
+      iOperacao := 0;
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 4;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+      //=============================================================//
+      nIndex := 0;
+      RM := 0;
+      D := 0;
+      DP := 0;
+      R := 0;
+      Periodo := (21);
+      //=============================================================//
+      //RANGE MEDIO DOS ULTIMOS 21 DIAS
+      for nIndex := 1 to (Periodo) Do
+        begin
+          R := R + (HighD(nIndex) - LowD(nIndex));
+        end;
+      RM := Round2fraction(R / Periodo);
+      fRM21_15Percent := Round2Fraction((10 / 100) * RM);
+      //============================================================//
+    end;
+  //========================//
+  pivot := (highd(1) + lowd(1) + closed(1)) / 3;
+  lhvar := Power((highd(1) - pivot),2);
+  llvar := Power((lowd(1) - pivot),2);
+  lcvar := Power((closed(1) - pivot),2);
+  ldev := sqrt((lhvar + llvar + lcvar) / 3);
+  //===========================================//
+  devP1 := (pivot + (pivot * (0.35 / 100)));
+  devP2 := (pivot + (pivot * (0.75 / 100)));
+  devP3 := (pivot + (pivot * (1 / 100)));
+  devN1 := (pivot - (pivot * (0.35 / 100)));
+  devN2 := (pivot - (pivot * (0.75 / 100)));
+  devN3 := (pivot - (pivot * (1 / 100)));
+  //=====================================//
+  fPivotN1 := devN1;
+  fPivotN2 := devN2;
+  fPivotN3 := devN3;
+  fPivotP3 := devP3;
+  fPivotP2 := devP2;
+  fPivotP1 := devP1;
+  //=========================================================================================================================================================//
+  B_prox_C_PivotN3 := (low <= (fPivotn3 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fPivotN3);
+  B_prox_C_PivotN2 := (low <= (fPivotn2 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fPivotN2);
+  B_prox_C_PivotN1 := (low <= (fPivotN1 + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= fPivotN1);
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  B_prox_V_PivotP3 := (high >= (fPivotP3 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fPivotP3);
+  B_prox_V_PivotP2 := (high >= (fPivotP2 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fPivotP2);
+  B_prox_V_PivotP1 := (high >= (fPivotP1 - (F_ProximidadeToqueTick * MinPriceIncrement))) and (high <= fPivotP1);
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  // Analisar rompimentos de venda.
+  if Close > (fPivotN1 + fRM21_15Percent) then
+    begin
+      // Todos os rompimentos Pivot de venda estão habilitados
+      bCompraPivotN1 := true;
+      bCompraPivotN2 := true;
+      bCompraPivotN3 := true;
+    end
+  else if Close > (fPivotN2 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Pivot de venda de P1 para baixo estão habilitados.
+      bCompraPivotN2 := true;
+      bCompraPivotN3 := true;
+    end
+  else if Close > (fPivotN3 + fRM21_15Percent) then
+    begin
+      // Os rompimentos Pivot de venda de VendaPivot para baixo estão habilitados.
+      bCompraPivotN3 := true;
+    end;
+  //=========================================================================================================================================================//
+  // Analisar rompimentos de compra.
+  if Close < (fPivotP1 - fRM21_15Percent) then
+    begin
+      // Todos os rompimentos Pivot de venda estão habilitados
+      bVendaPivotP1 := true;
+      bVendaPivotP2 := true;
+      bVendaPivotP3 := true;
+    end
+  else if Close < (fPivotP2 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Pivot de venda de P1 para baixo estão habilitados.
+      bVendaPivotP2 := true;
+      bVendaPivotP3 := true;
+    end
+  else if (Close < fPivotP3 - fRM21_15Percent) then
+    begin
+      // Os rompimentos Pivot de venda de VendaPivot para baixo estão habilitados.
+      bVendaPivotP3 := true;
+    end;
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) then
+    BEGIN
+      // Só reinicializa a entrada se não estiver controlando ordens stop.
+      if iEntradaStop = 0 then
+        Entrada := 0;
+      IF B_prox_V_PivotP1 and bVendaPivotP1 THEN
+        begin
+          iOperacao := VENDA_Pivot_P1;
+          ENTRADA := fPivotP1;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_PivotN1 and bCompraPivotN1 then
+        BEGIN
+          iOperacao := COMPRA_Pivot_N1;
+          ENTRADA := fPivotN1;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_PivotP2 and bVendaPivotP2 THEN
+        begin
+          iOperacao := VENDA_Pivot_P2;
+          ENTRADA := fPivotP2;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_PivotN2 and bCompraPivotN2 then
+        BEGIN
+          iOperacao := COMPRA_Pivot_N2;
+          ENTRADA := fPivotN2;
+          STOP_LOSS := Entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_V_PivotP3 and bVendaPivotP3 THEN
+        begin
+          iOperacao := VENDA_Pivot_P3;
+          ENTRADA := fPivotP3;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_PivotN3 and bCompraPivotN3 then
+        BEGIN
+          iOperacao := COMPRA_Pivot_N3;
+          ENTRADA := fPivotN3;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END;
+      ////======================================================================================================================================//
+      //=========================================================================================================================================================//
+      if (Entrada <> 0) then
+        begin
+          // Verificar se é compra ou venda.
+          if ((iOperacao = COMPRA_Pivot_N1) OR (iOperacao = COMPRA_Pivot_N2) OR (iOperacao = COMPRA_Pivot_N3)) OR ((iOperacao = VENDA_Pivot_P1) OR (iOperacao = VENDA_Pivot_P2) OR (iOperacao = VENDA_Pivot_P3)) then
+            begin
+              // Chegou em um rompimento comprador ou em um rompimento vendedor com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de compra, de acordo com o melhor preço de compra no book.
+              if (BidPrice >= Entrada) then
+                begin
+                  BuyLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (Entrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  BuyStop(Entrada,Entrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else 
+            begin
+              // Aqui é um rompimento vendedor ou um rompimento comprador com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+              if (AskPrice <= Entrada) then
+                begin
+                  SellShortLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (Entrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  SellShortStop(Entrada,Entrada);
+                  iEntradaStop := - 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+    end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsSold THEN
+        // TRAILING STOP DE VENDA
+        BEGIN
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS > SellPrice then
+                STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS < SellPrice then
+                STOP_LOSS := close + DistanciaPrecoPontos;
+            end;
+          //==> quantos ticks o preço andou
+          ////======================================================================================================================================//
+          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought THEN
+        BEGIN
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS < BuyPrice then
+                STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS > BuyPrice then
+                STOP_LOSS := Close - DistanciaPrecoPontos;
+            end;
+          ////======================================================================================================================================//
+          //==> quantos ticks o preço andou
+          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+            end;
+        END;
+      if ( Not HasPosition) then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    begin
+      // Verificar qual o ponto de venda para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = VENDA_Pivot_P1) then
+        // Desabilitar rompimento Pivot de venda de P1.
+        bVendaPivotP1 := false
+      else if (iOperacao = VENDA_Pivot_P2) then
+        // Desabilitar rompimento Pivot de venda de P2.
+        bVendaPivotP2 := false
+      else if (iOperacao = VENDA_Pivot_P3) then
+        // Desabilitar rompimento Pivot de venda de P1.
+        bVendaPivotP3 := false;
+      //======================================================================================================================================//
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop(STOP_LOSS,Stop_Offset);
+      iEntradaStop := 0;
+      IF (high > Stop_Offset) THEN
+        BuyToCoverAtMarket;
+    end;
+  //======================================================================================================================================//
+  IF IsBought then
+    begin
+      // Verificar qual o ponto de compra para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = COMPRA_Pivot_N1) then
+        // Desabilitar rompimento Pivot de compra de P1.
+        bCompraPivotN1 := false
+      else if (iOperacao = COMPRA_Pivot_N2) then
+        // Desabilitar rompimento Pivot de compra de P2.
+        bCompraPivotN2 := false
+      else if (iOperacao = COMPRA_Pivot_N3) then
+        // Desabilitar rompimento Pivot de compra de P1.
+        bCompraPivotN3 := false;
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,Stop_Offset);
+      iEntradaStop := 0;
+      IF (LOW < Stop_Offset) or (close < Stop_Offset) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  ////== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+  if not HasPosition and (iEntradaStop <> 0) and (Entrada <> 0) then
+    begin
+      // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(Entrada,Entrada)
+              else 
+                SellShortStop(Entrada,Entrada);
+            end;
+        end
+      else 
+        iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  //=========================================================================================================================================================//
+  if (Date >= CalcDate(CurrentDate, - DiasPlot)) then
+    begin
+      Plot(fPivotN1);
+      Plot2(fPivotN2);
+      Plot3(fPivotN3);
+      Plot4(fPivotP1);
+      Plot5(fPivotP2);
+      Plot6(fPivotP3);
+    end;
+  //=========================================================================================================================================================//
+end;

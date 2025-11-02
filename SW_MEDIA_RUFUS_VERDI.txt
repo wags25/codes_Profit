@@ -1,0 +1,88 @@
+//---------------------------------------------------------//
+//                 SW Media Rufus Verdi                    //
+//      Estratégia que busca identifar movimentos amplos   //
+//                Versão Beta 0.14                         //
+//                                                         //
+//                                                         //
+//---------------------------------------------------------//
+input
+  periodo(100);
+  Histograma(100);
+  Media_Curta(3);
+  Media_Longa(12);
+var
+  histogram_v3,histogram_MmeTripla : float;
+  MME_TRIPLA,MME_DUPLA,MME_SINGLE  : FLOAT;
+  fADX,fMediaADX                   : float;
+  bAdxTendency,bAdxDown            : boolean;
+  bTendencyBear,bTendencyBull      : boolean;
+  fMediaSinal,fMediaEntrada        : float;
+BEGIN
+  MME_SINGLE := MediaExp(Periodo,close);
+  MME_DUPLA := (2 * MME_SINGLE) - MediaExp(Periodo,close);
+  MME_TRIPLA := 3 * (MME_SINGLE - MediaExp(Periodo,MME_SINGLE)) + MediaExp(Periodo,MediaExp(Periodo,MME_SINGLE));
+  fADX := adx(8,8);
+  fMediaADX := Media(4,fADX);
+  bAdxTendency := (fAdx > fMediaADX) and (fADX >= 20);
+  bTendencyBear := MME_TRIPLA < MME_TRIPLA[1];
+  bTendencyBull := MME_TRIPLA > MME_TRIPLA[1];
+  //=========================================================//
+  { if (currentbar > periodo) then
+  begin
+  histogram_MmeTripla := 3 * (MME_SINGLE - MediaExp(histograma,MME_SINGLE)) + MediaExp(histograma,MediaExp(Periodo,MME_SINGLE));
+  histogram_v3 := (((histogram_MmeTripla / histogram_MmeTripla[1]) - 1) * 100) * 100;
+  //histogram_v31 := ((v31 / v31[1]) - 1) * 100;
+  end; }
+  if (currentbar > periodo) then
+    begin
+      histogram_MmeTripla := 3 * (MME_SINGLE - MediaExp(histograma,MME_SINGLE)) + MediaExp(histograma,MediaExp(Periodo,MME_SINGLE));
+      // Verificação para evitar divisão por zero
+      if histogram_MmeTripla[1] <> 0 then
+        histogram_v3 := (((histogram_MmeTripla / histogram_MmeTripla[1]) - 1) * 100) * 100
+      else 
+        histogram_v3 := 0;
+      // ou outro valor padrão que faça sentido no seu contexto
+    end;
+  fMediaSinal := WAverage(histogram_v3,Media_Curta);
+  fMediaEntrada := mediaExp(Media_Longa,histogram_v3);
+  //=========================================================//
+  begin
+    //TrendColor
+    if (histogram_v3 > 0) and (fMediaSinal > fMediaEntrada) and bTendencyBull then
+      paintbar(rgb(0,100,0))
+    // verde
+    {else if (histogram_v3 > 0) and (fMediaSinal < fMediaEntrada) and bTendencyBull then
+    // paintbar(rgb(0,255,0))
+    paintbar(rgb(0,255,0))
+    // LIME }
+    else if (histogram_v3 > 0) and (fMediaSinal < fMediaEntrada) and bTendencyBear then
+      paintbar(rgb(128,0,0))
+    //marrom
+    else if (histogram_v3 > 0) and (fMediaSinal > fMediaEntrada) and bTendencyBear then
+      //paintbar(clfucsia)
+      paintbar(rgb(128,0,0))
+    //marrom
+    else if (histogram_v3 < 0) and (fMediaSinal < fMediaEntrada) and bTendencyBear then
+      //SetPlotColor(1,rgb(0,0,0));
+      paintbar(rgb(255,0,0));
+    //vermelho
+    {else if (histogram_v3 < 0) and (fMediaSinal > fMediaEntrada) and (close >= MME_TRIPLA) then
+    paintbar(rgb(0,255,0));
+    //azul
+    // paintbar(rgb(0,255,0)); }
+  END;
+  //=========================================================//
+  begin
+    plot(MME_tripla);
+    if bTendencyBull then
+      begin
+        SetPlotColor(1,rgb(0,128,0));
+        //paintbar(rgb(0,255,127));
+      end
+    else if bTendencyBear then
+      begin
+        SetPlotColor(1,rgb(255,0,0));
+        //paintbar(rgb(255,0,0));
+      end;
+  end;
+end;

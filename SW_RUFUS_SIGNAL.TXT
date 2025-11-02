@@ -1,0 +1,94 @@
+//---------------------------------------------------------//
+//                 SW Media Rufus Signal                   //
+//      Estratégia que busca identifar movimentos amplos   //
+//                Versão Beta 0.14                         //
+//                                                         //
+//                                                         //
+//---------------------------------------------------------//
+var
+  histogram_v3,histogram_MmeTripla                                : float;
+  MME_TRIPLA,MME_DUPLA,MME_SINGLE                                 : FLOAT;
+  fADX,fMediaADX                                                  : float;
+  bAdxTendency,bAdxDown                                           : boolean;
+  bTendencyBear,bTendencyBull,DiaNovo                             : boolean;
+  fMediaSinal,fMediaEntrada                                       : float;
+  vencimento                                                      : integer;
+  periodo,histograma,Media_curta,Media_longa                      : integer;
+  bFirstSignalBull,bFirstSignalBear                               : boolean;
+  bbOPenUp,bbOpenDown,bbParallelDown,bbParallelUp,bbClose         : boolean;
+  upper,lower,basis,dev                                           : float;
+  precoMaxCandleSinal,precoMinCandleSinal,alvoCandleSinal,alvoDia : float;
+
+BEGIN
+  Vencimento := 1241201;
+  periodo := (100);
+  Histograma := (100);
+  Media_Curta := (3);
+  Media_Longa := (12);
+  // Detecta um novo dia e reinicializa o alvo
+  DiaNovo := Date > Date[1];
+  if DiaNovo then
+    alvoDia := 0;
+  // Reset do alvo no início de um novo dia
+  if (CurrentDate <= Vencimento) then
+    begin
+      MME_SINGLE := MediaExp(Periodo,close);
+      MME_DUPLA := (2 * MME_SINGLE) - MediaExp(Periodo,close);
+      MME_TRIPLA := 3 * (MME_SINGLE - MediaExp(Periodo,MME_SINGLE)) + MediaExp(Periodo,MediaExp(Periodo,MME_SINGLE));
+      fADX := adx(8,8);
+      fMediaADX := Media(4,fADX);
+      bAdxTendency := (fAdx > fMediaADX) and (fADX >= 20);
+      bTendencyBear := MME_TRIPLA < MME_TRIPLA[1];
+      bTendencyBull := MME_TRIPLA > MME_TRIPLA[1];
+      //=========================================================//
+      if (currentbar > periodo) then
+        begin
+          histogram_MmeTripla := 3 * (MME_SINGLE - MediaExp(histograma,MME_SINGLE)) + MediaExp(histograma,MediaExp(Periodo,MME_SINGLE));
+          // Verificação para evitar divisão por zero
+          if histogram_MmeTripla[1] <> 0 then
+            histogram_v3 := (((histogram_MmeTripla / histogram_MmeTripla[1]) - 1) * 100) * 100
+          else 
+            histogram_v3 := 0;
+          // ou outro valor padrão que faça sentido no seu contexto
+        end;
+      fMediaSinal := WAverage(histogram_v3,Media_Curta);
+      fMediaEntrada := mediaExp(Media_Longa,histogram_v3);
+      //=========================================================//
+      basis := media(20,close);
+      upper := BollingerBands(2,20,0)|0|;
+      lower := BollingerBands(2,20,0)|1|;
+      // Bollinger Bands \\
+      bbOpenUp := (upper > upper[1]) and (lower < lower[1]) and (basis > basis[1]);
+      bbOpenDown := (upper > upper[1]) and (lower < lower[1]) and (basis < basis[1]);
+      bbParallelUp := (upper > upper[1]) and ((lower > lower[1]) or (lower = lower[1]));
+      bbParallelDown := ((upper < upper[1]) or (upper = upper[1])) and (lower < lower[1]);
+      bbClose := (upper <= upper[1]) and (lower >= lower[1]);
+      // plot(upper);
+      // plot2(lower);
+      //=========================================================//
+      if bbParallelUp or bbOpenUp then
+        begin
+          //TrendColor
+          if (histogram_v3 > 0) and (fMediaSinal > fMediaEntrada) and bTendencyBull and not bFirstSignalBull then
+            begin
+              paintbar(rgb(0,255,0));
+              bFirstSignalBull := true;
+              bFirstSignalBear := false;   
+               select;
+            end;
+        end
+      else if bbParallelDown or bbOpenDown then
+        begin
+          if (histogram_v3 < 0) and (fMediaSinal < fMediaEntrada) and bTendencyBear and not bFirstSignalBear then
+            begin
+              
+              paintbar(rgb(255,0,0));
+              bFirstSignalBear := true;
+              bFirstSignalBull := false;
+              select;
+            end;
+        end;
+   
+      //=========================================================//
+    end;
+end;

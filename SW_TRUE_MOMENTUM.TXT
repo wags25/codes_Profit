@@ -1,0 +1,85 @@
+// Conversão do indicador "True Momentum Oscillator" para NTSL
+input
+  Comprimento(14);
+  ComprimentoCalc(5);
+  ComprimentoSuav(3);
+  TipoMedia("EMA");
+  // Opções: "EMA", "SMA", "RMA"
+  TipoMediaCalc("EMA");
+  TipoMediaSuav("EMA");
+var
+  Momentum, Soma, MediaCalc, Principal, Sinal : Float;
+  Indice                                      : Integer;
+  CorPrincipal, CorSinal                      : Integer;
+  bFirstSignalBull, bFirstSignalBear          : boolean;
+  // Função para cálculo de médias móveis
+function CalcularMedia(Tipo : String; Comprimento : Integer; ValorAtual : Float; ValorAnterior : Float) : Float;
+begin
+  if (Tipo = "EMA") then
+    Result := (ValorAtual + ValorAnterior * (Comprimento - 1)) / Comprimento
+  // EMA simplificada
+  else if (Tipo = "SMA") then
+    Result := (ValorAtual + ValorAnterior) / 2
+  // SMA simples
+  else 
+    Result := (ValorAtual + ValorAnterior) / Comprimento;
+  // Aproximação do RMA
+end;
+
+begin
+  // Cálculo do Momentum
+  Soma := 0;
+  for Indice := 0 to Comprimento - 1 do
+    begin
+      if (Close > Open[Indice]) then
+        Soma := Soma + 1
+      else if (Close < Open[Indice]) then
+        Soma := Soma - 1;
+    end;
+  Momentum := Soma;
+  // Cálculo das médias móveis
+  MediaCalc := CalcularMedia(TipoMedia, ComprimentoCalc, Momentum, 0);
+  Principal := CalcularMedia(TipoMediaCalc, ComprimentoSuav, MediaCalc, 0);
+  Sinal := CalcularMedia(TipoMediaSuav, ComprimentoSuav, Principal, 0);
+  
+  // Definir cores com base nas condições
+  if (Principal > Sinal) then
+    begin
+      CorPrincipal := clGreen;
+      CorSinal := clGreen;
+    end
+  else 
+    begin
+      CorPrincipal := clRed;
+      CorSinal := clRed;
+    end;
+
+  // Plotagem das linhas principais
+  Plot(Principal);
+  SetPlotColor(1, CorPrincipal);
+  Plot2(Sinal);
+  SetPlotColor(2, CorSinal);
+
+  // Plotagem de linhas de referência
+ 
+
+  // Coloração dos candles, apenas o primeiro candle do sinal
+  if (Principal > Sinal) then
+    begin
+      if not bFirstSignalBull then
+        begin
+          PaintBar(clGreen);
+          bFirstSignalBull := true;
+          bFirstSignalBear := false;
+        end;
+    end
+  else if (Principal < Sinal) then
+    begin
+      if not bFirstSignalBear then
+        begin
+          PaintBar(clRed);
+          bFirstSignalBear := true;
+          bFirstSignalBull := false;
+        end;
+    end;
+end;

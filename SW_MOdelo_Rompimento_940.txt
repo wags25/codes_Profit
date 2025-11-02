@@ -1,0 +1,192 @@
+const
+  DAYTRADE       = TRUE;
+  HORAENTRADA    = 0921;
+  HORASAIDA      = 1700;
+  HORAFECHAMENTO = 1710;
+  OFFSET_ENTRADA = 2;
+INPUT
+   ModuloAutomacao(True);
+  StopEmPontos(5);
+  stopOffset(10);
+  AlvoEmPontos(25);
+  BreakevenEmPontos(7);
+  DistanciaEntradaPontos(0.5);
+  TraillingStopTrigger(11);
+  DistanciaPrecoPontos(8);
+  DistUltPreco(8);
+  FrequenciaAjuste(3);
+  respiro(1);
+  QtdeMaxOperacoesNoDia(2);
+  ContraEstrategia(false);
+VAR
+  TIME_BAR,CONT_CANDLE,CONT_CANDLE7 : BOOLEAN;
+  ENTRADA,STOP_LOSS,GAIN            : FLOAT;
+  TrailingStopAtivado               : boolean;
+  FloorTraillingStop                : float;
+  BreakevenAtivado                  : boolean;
+  PrecoStopOffset                   : float;
+  maxm,minm,r                       : float;
+  iDivisor,iPeriodo,i               : integer;
+  F_ProximidadeToqueTick            : float;
+  B_prox_Minm,B_prox_Maxm           : boolean;
+  QtdeOperacoesNoDia                : integer;
+  DataAtual                         : integer;
+  JaContouOperacao                  : boolean;
+begin
+  {CONDICIONAIS PARA O TEMPO DO CANDLE E NUMERO DO CANDLE}
+  TIME_BAR := (Time >= 0940) and (Time < 0945);
+  R := RESPIRO * MinPriceIncrement;
+  //======================================================================================================================================//
+  iPeriodo := BarDuration;
+  if Time_Bar = True then
+    begin
+      iDivisor := ((Time - 0940) / iPeriodo) + 1;
+      maxm := high;
+      minm := low;
+      for i := 1 to iDivisor - 1 do
+        begin
+          if High[i] > maxm then
+            maxm := High[i];
+          if Low[i] < minm then
+            minm := Low[i];
+        end;
+    end;
+  plot(maxm);
+  plot2(minm);
+  //======================================================================================================================================//
+  F_ProximidadeToqueTick := (6);
+  B_prox_Maxm := (HIGH >= (Maxm - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= (Maxm + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  B_prox_Minm := (Low <= (Minm + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (Low >= (Minm - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  //======================================================================================================================================//
+  //=========================================================================================================================================================//
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+    end;
+  //=========================================================================================================================================================//
+  if ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) then
+    begin
+      if (TIME >= 0946) and (B_prox_Maxm = True) THEN
+        BEGIN
+          ENTRADA := maxm + r;
+          STOP_LOSS := entrada - (maxm - minm);
+          GAIN := ENTRADA + AlvoEmPontos;
+          if (BidPrice >= ENTRADA) then
+            BuyLimit(ENTRADA)
+           // BuyAtMarket
+          else 
+            BuyStop(ENTRADA,ENTRADA+OFFSET_ENTRADA);
+        END
+      else if (TIME >= 0946) and (B_prox_Minm = True) THEN
+        BEGIN
+          ENTRADA := minm - r;
+          STOP_LOSS := entrada + (maxm - minm);
+          GAIN := ENTRADA - AlvoEmPontos;
+          if (AskPrice <= ENTRADA) then
+            SellShortLimit(ENTRADA)
+           // SellShortAtMarket
+          else 
+            SellShortStop(ENTRADA,ENTRADA-OFFSET_ENTRADA);
+        END;
+    end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsSold then
+        BEGIN
+          { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+          if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS > SellPrice then
+                STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS < SellPrice then
+                STOP_LOSS := close + DistanciaPrecoPontos;
+            end;
+          //==> quantos ticks o preço andou
+          ////======================================================================================================================================//
+          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought then
+        BEGIN
+          { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+          if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS < BuyPrice then
+                STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS > BuyPrice then
+                STOP_LOSS := Close - DistanciaPrecoPontos;
+            end;
+          ////======================================================================================================================================//
+          //==> quantos ticks o preço andou
+          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+            end;
+        end;
+      if Not HasPosition then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    BEGIN
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop(STOP_LOSS,STOP_LOSS + stopOffset);
+      IF (high > STOP_LOSS) THEN
+        BuyToCoverAtMarket;
+    END;
+  ////======================================================================================================================================//
+  IF IsBought then
+    begin
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,STOP_LOSS - stopOffset);
+      IF (LOW < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  if IsBought and Not JaContouOperacao THEN
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  if IsSold and Not JaContouOperacao THEN
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  ////======================================================================================================================================//
+  {FECHAR TODAS POSIÇOES AM ABERTO}
+  IF (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    CLOSEPOSITION;
+  if Not IsBought and Not isSold and JaContouOperacao then
+    JaContouOperacao := false;
+END;
+////======================================================================================================================================//

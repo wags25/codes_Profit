@@ -1,0 +1,79 @@
+var
+  fMME05,fMME10,fMME15,fMME20,fMME100 : float;
+  fMME25,fMME30,fMME35,fMME40         : float;
+  fMME45,fMME50,fMME55,fMME60         : float;
+  fMME65,fMME70,fMME75,fMME80         : float;
+  fMME85,fMME90                       : float;
+Funcao MadridColor(_MadridDif : real;
+_Madrid : real;_MadridRef : real) : inteiro;
+begin
+  if (_MadridDif >= 0) e (_Madrid > _MadridRef) then
+    result := rgb(0,255,0)
+  else if (_MadridDif < 0) e (_Madrid > _MadridRef) then
+    result := rgb(128,0,0)
+  else if (_MadridDif <= 0) e (_Madrid < _MadridRef) then
+    result := rgb(255,0,0)
+  else if (_MadridDif >= 0) e (_Madrid < _MadridRef) then
+    result := rgb(0,100,0);
+end;
+begin
+  fMME05 := MediaExp(5,close);
+  fMME10 := MediaExp(10,close);
+  fMME15 := MediaExp(15,close);
+  fMME20 := MediaExp(20,close);
+  fMME25 := MediaExp(25,close);
+  fMME30 := MediaExp(30,close);
+  fMME35 := MediaExp(35,close);
+  fMME40 := MediaExp(40,close);
+  fMME45 := MediaExp(45,close);
+  fMME50 := MediaExp(50,close);
+  fMME55 := MediaExp(55,close);
+  fMME60 := MediaExp(60,close);
+  fMME65 := MediaExp(65,close);
+  fMME70 := MediaExp(70,close);
+  fMME75 := MediaExp(75,close);
+  fMME80 := MediaExp(80,close);
+  fMME85 := MediaExp(85,close);
+  fMME90 := MediaExp(90,close);
+  fMME100 := MediaExp(100,close);
+  //==========================================//
+  Plot(fMME05);
+  Plot2(fMME10);
+  Plot3(fMME15);
+  Plot4(fMME20);
+  Plot5(fMME25);
+  Plot6(fMME30);
+  Plot7(fMME35);
+  Plot8(fMME40);
+  Plot9(fMME45);
+  Plot10(fMME50);
+  Plot11(fMME55);
+  Plot12(fMME60);
+  Plot13(fMME65);
+  Plot14(fMME70);
+  Plot15(fMME75);
+  Plot16(fMME80);
+  Plot17(fMME85);
+  Plot18(fMME90);
+  //================================================================//
+  SetPlotWidth(1,3);
+  SetPlotColor(1,MadridColor(fMME05 - fMME05[1],fMME05,fMME100));
+  SetPlotColor(2,MadridColor(fMME10 - fMME10[1],fMME10,fMME100));
+  SetPlotColor(3,MadridColor(fMME15 - fMME15[1],fMME15,fMME100));
+  SetPlotColor(4,MadridColor(fMME20 - fMME20[1],fMME20,fMME100));
+  SetPlotColor(5,MadridColor(fMME25 - fMME25[1],fMME25,fMME100));
+  SetPlotColor(6,MadridColor(fMME30 - fMME30[1],fMME30,fMME100));
+  SetPlotColor(7,MadridColor(fMME35 - fMME35[1],fMME35,fMME100));
+  SetPlotColor(8,MadridColor(fMME40 - fMME40[1],fMME40,fMME100));
+  SetPlotColor(9,MadridColor(fMME45 - fMME45[1],fMME45,fMME100));
+  SetPlotColor(10,MadridColor(fMME50 - fMME50[1],fMME50,fMME100));
+  SetPlotColor(11,MadridColor(fMME55 - fMME55[1],fMME55,fMME100));
+  SetPlotColor(12,MadridColor(fMME60 - fMME60[1],fMME60,fMME100));
+  SetPlotColor(13,MadridColor(fMME65 - fMME65[1],fMME65,fMME100));
+  SetPlotColor(14,MadridColor(fMME70 - fMME70[1],fMME70,fMME100));
+  SetPlotColor(15,MadridColor(fMME75 - fMME75[1],fMME75,fMME100));
+  SetPlotColor(16,MadridColor(fMME80 - fMME80[1],fMME80,fMME100));
+  SetPlotColor(17,MadridColor(fMME85 - fMME85[1],fMME85,fMME100));
+  SetPlotColor(18,MadridColor(fMME90 - fMME90[1],fMME90,fMME100));
+  SetPlotWidth(18,3);
+end;

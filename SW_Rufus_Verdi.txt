@@ -1,0 +1,50 @@
+input
+  periodo(100);
+  Media_Curta(3);
+  Media_Longa(12);
+var
+  v1,v2,v3,v8,v4                  : float;
+  v11,v21,v31                     : float;
+  len                             : integer;
+  histogram_v3,histogram_v31      : float;
+  MME_TRIPLA,MME_DUPLA,MME_SINGLE : FLOAT;
+  fMediaSinal,fMediaEntrada:float;
+BEGIN
+  MME_SINGLE := MediaExp(Periodo,close);
+  MME_DUPLA := (2 * MME_SINGLE) - MediaExp(Periodo,close);
+  MME_TRIPLA := 3 * (MME_SINGLE - MediaExp(Periodo,MME_SINGLE)) + MediaExp(Periodo,MediaExp(Periodo,MME_SINGLE));
+  fMediaSinal:= WAverage(histogram_v3,Media_Curta);
+  fMediaEntrada:= mediaExp(Media_Longa,histogram_v3);
+  //=============================================================================//
+  v11 := MediaExp(Periodo,low);
+  v21 := (2 * v11) - MediaExp(Periodo,low);
+  v31 := 3 * (v11 - MediaExp(Periodo,v11)) + MediaExp(Periodo,MediaExp(Periodo,v11));
+  begin
+    //TrendColor
+    if (histogram_v3 > 0) then
+      SetPlotColor(1,clgreen)
+    else if (histogram_v3 < 0) then
+      SetPlotColor(1,rgb(255,0,0));
+  END;
+  if (currentbar > periodo) then
+    begin
+      histogram_v3 := (((MME_TRIPLA / MME_TRIPLA[1]) - 1) * 100)*100;
+      histogram_v31 := ((v31 / v31[1]) - 1) * 100;
+    end;
+  plot(histogram_v3);
+  //plot2(histogram_v31);
+  plot2(mediaExp(Media_Longa,histogram_v3));
+  plot3(WAverage(histogram_v3,Media_Curta));
+
+  SetPlotColor(2,clwhite);
+  SetPlotColor(3,clblack);
+ {if( fMediaSinal > 0 ) and (fMediaSinal <fMediaEntrada) then
+ begin
+ paintbar(clyellow);
+ end else
+  if( fMediaSinal < 0 ) and (fMediaSinal >fMediaEntrada) then
+ begin
+ paintbar(claqua);
+ end;   }
+
+END;

@@ -1,0 +1,162 @@
+Const
+  Vencimento = 1241102;
+var
+  ACGS,AVB,STOCH14,STOCH9,STOCH20,ZSCORE : FLOAT;
+  COND1V,COND2V,COND3V,COND4V,COND5V,COND6V,COND1C,COND2C,COND3C,COND4C,COND5C,COND6C : BOOLEAN;
+  COND1VR,COND2VR,COND3VR,COND4VR,COND5VR,COND6VR,COND1CR,COND2CR,COND3CR,COND4CR,COND5CR,COND6CR : BOOLEAN;
+  STOP_LOSS,ENTRADA,GAIN,R : FLOAT;
+  MME6,MME8,MME20,MME5 : FLOAT;
+  //vencimento                                                                                      : integer;
+  nIndex,Index : Integer;
+  sSum,sFactor : Float;
+begin
+  //==============================================//
+  // // MEDIA EXPONENCIAL DE 6 PERIODOS
+  if (CurrentBar = (6 - 1)) then
+    begin
+      sSum := 0;
+      for nIndex := 0 to (6 - 1) do
+        sSum := sSum + Close[nIndex];
+      MME8 := sSum / (6 - 1);
+      //////////////////////////////////////////
+      // Retorna o resultado da primeira posição
+    end
+  //////////////////
+  // Demais valores
+  else if (CurrentBar > (6 - 1)) then
+    begin
+      sFactor := 2 / (6 + 1);
+      MME6 := Close * sFactor + MME6[1] * (1 - sFactor);
+      ///////////////////////////////////////
+      // Retorna o resultado da posição atual
+    end;
+  //=========================================//
+  // // MEDIA EXPONENCIAL DE 8 PERIODOS
+  if (CurrentBar = (8 - 1)) then
+    begin
+      sSum := 0;
+      for nIndex := 0 to (8 - 1) do
+        sSum := sSum + Close[nIndex];
+      MME8 := sSum / (8 - 1);
+      //////////////////////////////////////////
+      // Retorna o resultado da primeira posição
+    end
+  //////////////////
+  // Demais valores
+  else if (CurrentBar > (8 - 1)) then
+    begin
+      sFactor := 2 / (8 + 1);
+      MME8 := Close * sFactor + MME8[1] * (1 - sFactor);
+      ///////////////////////////////////////
+      // Retorna o resultado da posição atual
+    end;
+  //============================================//
+  // MEDIA EXPONENCIAL DE 20 PERIODOS
+  if (CurrentBar = (20 - 1)) then
+    begin
+      sSum := 0;
+      for nIndex := 0 to (20 - 1) do
+        sSum := sSum + Close[nIndex];
+      MME20 := sSum / (20 - 1);
+      //////////////////////////////////////////
+      // Retorna o resultado da primeira posição
+    end
+  //==============================================//
+  //////////////////
+  // Demais valores
+  else if (CurrentBar > (20 - 1)) then
+    begin
+      sFactor := 2 / (20 + 1);
+      MME20 := Close * sFactor + MME20[1] * (1 - sFactor);
+      ///////////////////////////////////////
+      // Retorna o resultado da posição atual
+    end;
+  //==================================================//
+  // PARAMETROS DA CONDIÇÃO DE VENDA
+  ACGS := AccAgressSaldo(1);
+  AVB := AgressionVolBalance;
+  STOCH14 := SlowStochastic(14);
+  STOCH9 := SlowStochastic(9);
+  STOCH20 := SlowStochastic(20);
+  { PRIMEIRA PARTE É A PARTE PARA CANDLE}
+  ///=================================================================================================================================================================================================///
+  // CONDICIONAIS VENDA
+  COND1V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80));
+  COND2V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MMe8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80));
+  { COND3V := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);
+  COND4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);
+  COND5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20);}
+  COND3V := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND6V := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME5) AND (HIGH > MME8) AND (HIGH > MME20);
+  /// CONDICIONAIS DE COMPRA
+  COND1C := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20);
+  COND2C := (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) and (STOCH14 <= 20) and (STOCH20 <= 20);
+  {COND3C := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  COND4C := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  COND5C := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  COND6C := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20); }
+  COND3C := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20);
+  COND4C := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20);
+  COND5C := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20);
+  COND6C := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME6) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20) and (STOCH20 <= 20);
+  ///=================================================================================================================================================================================================///
+  { SEGUNDA PARTE É A DO RENKO}
+  ///=================================================================================================================================================================================================///
+  //// CONDICIONAIS VENDA
+  COND1VR := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80));
+  COND2VR := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80));
+  COND3VR := ((ACGS > 0) AND (AVB > 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND4VR := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND5VR := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  COND6VR := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME8) AND (HIGH > MME20);
+  /// CONDICIONAIS DE COMPRA
+  COND1CR := (AVB > 0) AND (STOCH20 > 20) AND (STOCH20 < 30) AND (STOCH20 > STOCH20[1]) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20);
+  COND2CR := (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME6) AND (HIGH < MME8) AND (HIGH < MME20);
+  COND3CR := (ACGS < 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20);
+  COND4CR := (ACGS < 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20);
+  COND5CR := (ACGS > 0) AND (AVB < 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20);
+  COND6CR := (ACGS > 0) AND (AVB > 0) AND (CLOSE > OPEN) AND (LOW < MME8) AND (LOW < MME20) AND (HIGH < MME8) AND (HIGH < MME20) AND (STOCH14 <= 20);
+  ///=================================================================================================================================================================================================///
+  ///=================================================================================================================================================================================================///
+  begin
+    IF (ISBMF) THEN
+      begin
+        if (CurrentDate <= Vencimento) then
+          begin
+            if COND1V OR COND2V OR COND3V OR COND4V OR COND5V OR COND6V THEN
+              begin
+                plotText(low,clwhite,0,10);
+                paintbar(rgb(0,0,255));
+              end;
+            if COND1C OR COND2C OR COND3C OR COND4C OR COND5C OR COND6C THEN
+              BEGIN
+                plotText(HIGH,clwhite,2,10);
+                paintbar(rgb(255,255,0));
+              end;
+          end;
+      end;
+  end;
+  ///=================================================================================================================================================================================================///
+  ///=================================================================================================================================================================================================///
+  begin
+    IF (ISBMF) and (bartype = - 1) THEN
+      begin
+        if (CurrentDate <= Vencimento) then
+          begin
+            if COND1VR OR COND2VR OR COND3VR OR COND4VR OR COND5VR OR COND6VR THEN
+              begin
+                plotText(low,clwhite,0,10);
+                paintbar(rgb(0,0,255));
+              end
+            ELSE if COND1CR OR COND2CR OR COND3CR OR COND4CR OR COND5CR OR COND6CR THEN
+              BEGIN
+                plotText(HIGH,clwhite,2,10);
+                paintbar(rgb(255,255,0));
+              end;
+          end;
+      end;
+  end;
+  ///=================================================================================================================================================================================================///
+end;

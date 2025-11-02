@@ -1,0 +1,317 @@
+input
+  PriceSource(close);
+  SetupBars(9);
+  CntdwnBars(13);
+  SetupLookback(3);
+  CntdwnLookback(2);
+  SetupPerfLookback(3);
+var
+  //===========================================================//
+  //Variaveis do SWS
+  ACOND1V,ACOND2V,ACOND3V,ACOND4V,ACOND5V,ACOND6V                 : BOOLEAN;
+  ACOND1C,ACOND2C,ACOND3C,ACOND4C,ACOND5C,ACOND6C,ACOND7c,ACOND8c : BOOLEAN;
+  COND1V,COND2V,COND3V,COND4V,COND5V,COND6V                       : BOOLEAN;
+  COND1C,COND2C,COND3C,COND4C,COND5C,COND6C                       : BOOLEAN;
+  COND1VR,COND2VR,COND3VR,COND4VR,COND5VR,COND6VR                 : BOOLEAN;
+  COND1CR,COND2CR,COND3CR,COND4CR,COND5CR,COND6CR                 : BOOLEAN;
+  bDetectorSell_55Div,bDetectorBuy_55Div                          : boolean;
+  bDetectorSell_15Div,bDetectorBuy_15Div                          : boolean;
+  bDetectorSell_10Div,bDetectorBuy_10Div                          : boolean;
+  bDetectorSell_5Div,bDetectorBuy_5Div                            : boolean;
+  bDetectorSell,bDetectorBuy                                      : boolean;
+  MM6,MM8,MM20,MM5,MME5                                           : FLOAT;
+  ACGS,AVB,MME6,MME8,MME20,STOCH14,STOCH9,STOCH20,ZSCORE          : FLOAT;
+  //===========================================================//
+  // Variaveis do Adx
+  bAdxSubinte,bAdxCainte                                          : Boolean;
+  bAdxTrendUpStrong,bAdxTrendUp                                   : boolean;
+  badxTrendUpCainte,badxTrendDown,badxTrendDownStrong             : boolean;
+  badxTrendDownFalling,badxKick                                   : boolean;
+  fAdx,fDip,fDim                                                  : float;
+  MediaAdx                                                        : float;
+  fMediaDip,fMediaDim                                             : float;
+  //===========================================================//
+  ReCond1,ReCond2                                                 : boolean;
+  b_Bear_active_candle,b_bear_signal_active                       : boolean;
+  b_Bull_active_candle,b_bull_signal_active                       : boolean;
+  V_up,V_dn                                                       : boolean;
+  bull_candle,bear_candle                                         : float;
+  f_Bull_active_candle_low,f_Bull_active_candle_high              : float;
+  f_bull_candle_count,f_bear_candle_count                         : float;
+  f_bear_active_candle_high,f_bear_active_candle_low              : float;
+  look_back,confirm                                               : integer;
+  //===========================================================//
+  nIndex                                                          : integer;
+  vencimento                                                      : integer;
+  //===========================================================//
+  //Variaveis do TD Sequential
+  setupCountUp                                                    : integer;
+  setupCountDown                                                  : integer;
+  cntdwnCountUp                                                   : integer;
+  cntdwnCountDown                                                 : integer;
+  setupSell                                                       : float;
+  setupBuy                                                        : float;
+  setupSellPerfPrice                                              : float;
+  setupBuyPerfPrice                                               : float;
+  //===========================================================//
+  // estratégia 123
+  IFRValor                                                        : Float;
+  // Valor do IFR
+  PeriodoIFR                                                      : integer;
+  ////======================================================================================================================================//
+begin
+  if (Date > Date[1]) then
+    begin
+      b_Bull_active_candle := false;
+      b_bull_signal_active := false;
+      f_Bull_active_candle_high := 0.0;
+      f_Bull_active_candle_low := 0.0;
+      f_bull_candle_count := 0;
+      //============================//
+      b_Bear_active_candle := false;
+      b_bear_signal_active := false;
+      f_bear_active_candle_high := 0.0;
+      f_bear_active_candle_low := 0.0;
+      f_bear_candle_count := 0;
+      bull_candle := 0;
+      bear_candle := 0;
+      v_up := false;
+      v_dn := false;
+      look_back := 20;
+      confirm := 3;
+      //============================//
+      PeriodoIFR := 14;
+    end;
+  //================================================================================================================================================//
+  //
+  //================================================================================================================================================//
+  // PARAMETROS DAS CONDIÇÕES DE DIVERGÊNCIAS
+  bDetectorSell_5Div := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+  bDetectorBuy_5Div := (DivergenceDetector(5,5,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+  //=================================================================================================================//
+  bDetectorSell_10Div := (DivergenceDetector(10,10,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+  bDetectorBuy_10Div := (DivergenceDetector(10,10,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+  //=================================================================================================================//
+  bDetectorSell_15Div := (DivergenceDetector(15,15,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+  bDetectorBuy_15Div := (DivergenceDetector(15,15,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+  //=================================================================================================================//
+  bDetectorSell_55Div := (DivergenceDetector(55,55,true,true,true,true,true,true,true,true,true,true,true)|1|) >= 1;
+  bDetectorBuy_55Div := (DivergenceDetector(55,55,true,true,true,true,true,true,true,true,true,true,true)|1|) <= - 1;
+  //=================================================================================================================//
+  ACGS := AccAgressSaldo(1);
+  AVB := AgressionVolBalance;
+  MME5 := MEDIAEXP(5,CLOSE);
+  MME6 := MEDIAEXP(6,CLOSE);
+  MME8 := MediaExp(8,CLOSE);
+  MME20 := MediaExp(20,CLOSE);
+  STOCH14 := SlowStochastic(14);
+  STOCH9 := SlowStochastic(9);
+  STOCH20 := SlowStochastic(20);
+  //================================================================================================================================================//
+  //============================================================//
+  for nIndex := 0 to (look_back - 1) Do
+    begin
+      if close < low[nindex] then
+        bull_candle := bull_candle + 1;
+      if Close > high[nIndex] then
+        bear_candle := bear_candle + 1;
+    end;
+  //===============================================================//
+  if (bull_candle = look_back - 1) then
+    begin
+      b_Bull_active_candle := true;
+      f_Bull_active_candle_low := low;
+      f_Bull_active_candle_high := high;
+      b_bull_signal_active := false;
+      f_bull_candle_count := 0;
+    end;
+  if b_bull_active_candle = true then
+    f_bull_candle_count := f_bull_candle_count + 1;
+  //==============================================================//
+  if (bear_candle = look_back - 1) then
+    begin
+      b_Bear_active_candle := true;
+      f_Bear_active_candle_low := low;
+      f_Bear_active_candle_high := high;
+      b_bear_signal_active := false;
+      f_bear_candle_count := 0;
+    end;
+  if b_bear_active_candle = true then
+    f_bear_candle_count := f_bear_candle_count + 1;
+  //==========================================================//
+  if close < f_bull_active_candle_low then
+    b_bull_active_candle := false;
+  if close > f_bear_active_candle_high then
+    b_bear_active_candle := false;
+  //===================================================================//
+  Recond1 := (b_bull_active_candle = true) and (close > f_bull_active_candle_high) and (b_bull_signal_active = false) and (f_bull_candle_count <= (confirm + 1));
+  //====================================================================================================================================================//
+  ReCond2 := (b_bear_active_candle = true) and (close < f_bear_active_candle_low) and (b_bear_signal_active = false) and (f_bear_candle_count <= (confirm + 1));
+  ///===================================================================================================================================================================================================================///
+  // CONDICIONAIS VENDA
+  ACOND1V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80));
+  ACOND2V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80));
+  ACOND4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  ACOND5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75);
+  ACOND6V := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME5) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME5) AND (HIGH > MME8) AND (HIGH > MME20);
+  ///===================================================================================================================================================================================================================///
+  // CONDições de Compra
+  ACOND1C := (AVB > 0) AND (close > open) and (STOCH20 > 20) and (STOCH20 <= 30) and (STOCH20 > STOCH20[1]) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20);
+  ACOND2C := (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH20 >= 20);
+  ACOND3C := (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ACOND4C := (ACGS < 0) AND (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ACOND5C := (ACGS < 0) AND (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ACOND6C := (ACGS > 0) AND (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ACOND7C := (ACGS > 0) AND (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ACOND8C := (ACGS > 0) AND (AVB > 0) AND (Close = Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20);
+  ///===================================================================================================================================================================================================================///  }
+  { ACOND1V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) OR (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true) or (bDetectorSell_55Div = true));
+  ACOND2V := (AVB > 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) AND ((STOCH14 >= 80) AND (STOCH9 >= 80)) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true) or (bDetectorSell_55Div = true));
+  ACOND4V := (ACGS > 0) AND (AVB < 0) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true) or (bDetectorSell_55Div = true));
+  ACOND5V := ((ACGS < 0) AND (AVB < 0)) AND (CLOSE < OPEN) AND (LOW > MME6) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME6) AND (HIGH > MME8) AND (HIGH > MME20) and (STOCH14 >= 75) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true) or (bDetectorSell_55Div = true));
+  ACOND6V := (ACGS > 0) AND ((CLOSE < OPEN) OR (CLOSE = OPEN)) AND (STOCH14 < 90) AND (STOCH14 > 70) AND (STOCH14 < STOCH14[1]) AND (LOW > MME5) AND (LOW > MME8) AND (LOW > MME20) AND (HIGH > MME5) AND (HIGH > MME8) AND (HIGH > MME20) and ((bDetectorSell_5Div = true) or (bDetectorSell_10Div = true) or (bDetectorSell_15Div = true) or (bDetectorSell_55Div = true));
+  ///===================================================================================================================================================================================================================///
+  // CONDições de Compra
+  ACOND1C := (AVB > 0) AND (close > open) and (STOCH20 > 20) and (STOCH20 <= 30) and (STOCH20 > STOCH20[1]) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND2C := (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH20 >= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND3C := (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND4C := (ACGS < 0) AND (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND5C := (ACGS < 0) AND (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND6C := (ACGS > 0) AND (AVB < 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND7C := (ACGS > 0) AND (AVB > 0) AND (Close > Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ACOND8C := (ACGS > 0) AND (AVB > 0) AND (Close = Open) and (low < MME6) and (low < MME8) and (low < MME20) and (high < MME6) and (high < mme8) and (high < mme20) and (STOCH14 <= 20) and ((bDetectorBuy_5Div = true) or (bDetectorBuy_10Div = true) or (bDetectorBuy_15Div = true) or (bDetectorBuy_55Div = true));
+  ///===================================================================================================================================================================================================================/// }
+  //Estratégia 123
+  // Cálculo do IFR
+  IFRValor := RSI(14,1);
+  // Verifica se o IFR está sobrecomprado (acima de 70) ou sobrevendido (abaixo de 30)
+  if (IFRValor > 70) then
+    begin
+      // Identificação do ponto 1 apenas quando o IFR está sobrecomprado
+      if (High[2] < High[1]) and (High[0] < High[1]) then
+        begin
+          //Ponto1 := High[0];  // 123 De venda
+          PaintBar(rgb(0,0,255));
+          // Colore o candle de vermelho
+        end;
+    end
+  else if (IFRValor < 30) then
+    begin
+      // Identificação do ponto 2 apenas quando o IFR está sobrevendido
+      if (Low[2] > Low[1]) and (Low[0] > Low[1]) then
+        begin
+          //Ponto2 := Low[0];   // 123 de compra
+          PaintBar(RGB(255,255,50));
+          // Colore o candle de verde
+        end;
+    end;
+  ///===================================================================================================================================================================================================================///
+  //Td SEquential
+  ///===================================================================================================================================================================================================================///
+  begin
+    // Lógica do Setup (TD Setup)
+    if PriceSource > PriceSource[SetupLookback] then
+      setupCountUp := setupCountUp[1] + 1
+    else 
+      setupCountUp := 0;
+    if PriceSource < PriceSource[SetupLookback] then
+      setupCountDown := setupCountDown[1] + 1
+    else 
+      setupCountDown := 0;
+    // Plotando Setup de Venda (Setup Sell)
+    if setupCountUp = SetupBars then
+      begin
+        setupSell := PriceSource;
+        // Captura o preço do Setup de Venda
+        PaintBar(rgb(0,0,255));
+        // Barra Azul para setups de venda
+        PlotText("Sell Setup",clRed,2,15,High);
+        // Texto indicando Setup de Venda
+      end;
+    // Plotando Setup de Compra (Setup Buy)
+    if setupCountDown = SetupBars then
+      begin
+        setupBuy := PriceSource;
+        // Captura o preço do Setup de Compra
+        PaintBar(rgb(255,255,0));
+        // Barra Amarela para setups de compra
+        PlotText("BUY Setup",clgreen,0,15,LOW);
+        // Texto indicando Setup de Venda
+      end;
+    ///========================================================//
+    // Verificando o Setup de Venda Perfeito (Perfected Sell Setup)
+    if setupCountUp = SetupBars then
+      begin
+        setupSellPerfPrice := high[SetupPerfLookback];
+        if high >= setupSellPerfPrice then
+          begin
+            PaintBar(rgb(0,0,255));
+            // Barra amarela para Setup de Venda Perfeito
+            PlotText("Sell Perfect",clRed,2,15,High);
+            // Texto indicando Setup de Venda
+          end;
+      end;
+    // Verificando o Setup de Compra Perfeito (Perfected Buy Setup)
+    if setupCountDown = SetupBars then
+      begin
+        setupBuyPerfPrice := low[SetupPerfLookback];
+        if low <= setupBuyPerfPrice then
+          begin
+            PaintBar(rgb(255,255,0));            // Barra azul para Setup de Compra Perfeito
+            PlotText("Buy Perfect",clgreen,0,15,low);            // Texto indicando Setup de Venda
+          end;
+      end;
+    // Lógica do Countdown (Contagem Regressiva)
+    if PriceSource >= high[CntdwnLookback] then
+      cntdwnCountUp := cntdwnCountUp[1] + 1
+    else 
+      cntdwnCountUp := 0;
+    if PriceSource <= low[CntdwnLookback] then
+      cntdwnCountDown := cntdwnCountDown[1] + 1
+    else 
+      cntdwnCountDown := 0;
+    // Plotando Countdowns
+    if cntdwnCountUp = CntdwnBars then
+      PaintBar(clRed);    // Barra vermelha para countdown de venda
+    if cntdwnCountDown = CntdwnBars then
+      PaintBar(clGreen);    // Barra verde para countdown de compra
+  end;
+  ///===================================================================================================================================================================================================================///
+  //SWS
+  ///===================================================================================================================================================================================================================///
+  {begin
+  if ACOND1V OR ACOND2V OR ACOND3V OR ACOND4V OR ACOND5V OR ACOND6V THEN
+  begin
+  plotText(low,clwhite,0,10);
+  SELECT;
+  Alert(rgb(0,0,255));
+  // paintbar(rgb(255,69,0));
+  paintbar(rgb(0,0,255));
+  // paintbar(rgb(255,0,0));
+  end
+  ELSE if ACOND1C OR ACOND2C OR ACOND3C OR ACOND4C OR ACOND5C OR ACOND6C AND ACOND7C AND ACOND8C THEN
+  BEGIN
+  plotText(HIGH,clwhite,2,10);
+  sELECT;
+  alert(rgb(255,255,0));
+  paintbar(rgb(255,255,0));
+  //paintbar(rgb(255,69,0));
+  end;
+  end;         }
+  ///===================================================================================================================================================================================================================///
+  //
+  ///===================================================================================================================================================================================================================///
+  {if Recond1 then
+  begin
+  paintbar(rgb(255,69,0));
+  b_bull_signal_active := true;
+  v_up := true;
+  end;
+  if ReCond2 then
+  begin
+  paintbar(rgb(0,0,255));
+  b_bear_signal_active := true;
+  v_Dn := true;
+  end;  }
+end;
+end;

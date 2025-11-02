@@ -1,0 +1,17 @@
+input
+  length(14);
+  signalLength(5);
+  obLevel(80);
+  osLevel(20);
+var
+  src        : float;
+  mfi,signal : float;
+begin
+  src := (high + low + close) / 3;
+  mfi := MoneyFlowIndex(length);
+  signal := MediaExp(signalLength,mfi);
+  plot(mfi);
+  plot2(signal);
+  plot3(obLevel);
+  plot4(osLevel);
+end;

@@ -1,0 +1,225 @@
+CONST
+  DAYTRADE       = FALSE;
+  HORAENTRADA    = 0901;
+  HORASAIDA      = 1710;
+  HORAFECHAMENTO = 1730;
+  Pullback       = 200;
+  //=======================/
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(True);
+  StopEmPontos(250);
+  StopOffset(75);
+  AlvoEmPontos(1000);
+  BreakevenEmPontos(200);
+  DistanciaEntradaPontos(25);
+  TraillingStopTrigger(400);
+  DistanciaPrecoPontos(100);
+  DistUltPreco(100);
+  FrequenciaAjuste(50);
+  QtdeMaxOperacoesNoDia(2);
+var
+  Vencimento                                                                        : Integer;
+  F_PercentP_1,F_PercentP_15,F_PercentP_2,F_PercentP_05                             : float;
+  F_PercentP_161,F_PercentP_1561,F_PercentP_261,F_PercentP_0561                     : float;
+  F_PercentN_161,F_PercentN_1561,F_PercentN_261,F_PercentN_0561                     : float;
+  F_PercentN_1,F_PercentN_15,F_PercentN_2,F_PercentN_05                             : float;
+  F_ProximidadeToqueTick                                                            : float;
+  STOP_LOSS,ENTRADA,GAIN,R,Stop_Offset                                              : FLOAT;
+  TrailingStopAtivado                                                               : boolean;
+  fPrecoStopOffset,FloorTraillingStop                                               : float;
+  BreakevenAtivado                                                                  : boolean;
+  QtdeOperacoesNoDia                                                                : integer;
+  DataAtual                                                                         : integer;
+  JaContouOperacao                                                                  : boolean;
+  bPullbackCompra,bPullbackVenda                                                    : boolean;
+  B_prox_PercentP_0561,B_prox_PercentP_161,B_prox_PercentN_0561,B_prox_PercentN_161 : boolean;
+  bMovimentoAlta,bMovimentoBaixa                                                    : boolean;
+begin
+  F_PercentP_05 := Closed(1) + (closed(1) * (0.5 / 100));
+  F_PercentP_1 := Closed(1) + (closed(1) * (1 / 100));
+  F_PercentP_15 := Closed(1) + (closed(1) * (1.5 / 100));
+  F_PercentP_2 := Closed(1) + (closed(1) * (2 / 100));
+  //=====================================================================//
+  F_PercentN_05 := Closed(1) - (closed(1) * (0.5 / 100));
+  F_PercentN_1 := Closed(1) - (closed(1) * (1 / 100));
+  F_PercentN_15 := Closed(1) - (closed(1) * (1.5 / 100));
+  F_PercentN_2 := Closed(1) - (closed(1) * (2 / 100));
+  //=====================================================================//
+  F_PercentP_0561 := F_PercentP_1 - ((F_PercentP_1 - F_Percentp_05) * (0.618));
+  F_PercentP_161 := F_PercentP_15 - ((F_PercentP_15 - F_Percentp_1) * (0.618));
+  // F_PercentP_1561 := F_PercentP_1 - ((F_PercentP_1 - F_Percentp_05) * (0.618));
+  // F_PercentP_261 := F_PercentP_1 - ((F_PercentP_1 - F_Percentp_05) * (0.618));
+  //=====================================================================//
+  F_PercentN_0561 := F_PercentN_1 + ((F_PercentN_05 - F_PercentN_1) * (0.618));
+  F_PercentN_161 := F_PercentN_15 + ((F_PercentN_1 - F_Percentn_15) * (0.618));
+  //=====================================================================//
+  begin
+    plot(F_PercentP_0561);
+    plot2(F_PercentP_161);
+    plot3(F_PercentN_0561);
+    plot4(F_PercentN_161);
+  end;
+  //=====================================================================//
+  if (Date > Date[1]) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      bMovimentoAlta := false;
+      bMovimentoBaixa := false;
+      F_ProximidadeToqueTick := (10);
+    end;
+  //=========================================================================================================================================================//
+  // Verificar se existe nova máxima.
+  if (High > High[1]) and (low > low[1]) then
+    bMovimentoAlta := true;
+  // Verificar se existe nova mínima.
+  if (Low < Low[1]) and (high < high[1]) then
+    bMovimentoBaixa := true;
+  //=========================================================================================================================================================//
+  B_prox_PercentP_0561 := (HIGH >= (F_PercentP_0561 - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  B_prox_PercentN_0561 := (Low <= (F_PercentN_0561 + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  //=========================================================================================================================================================//
+  // Inicialização do contador de ordens do dia
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      QtdeOperacoesNoDia := 0;
+      JaContouOperacao := false;
+    end;
+  //=========================================================================================================================================================//
+  begin
+    if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) then
+      BEGIN
+        IF (B_prox_PercentP_0561) and bMovimentoAlta THEN
+          begin
+            // PARÂMETROS DE ENTRADA E SAIDA
+            ENTRADA := F_PercentP_0561;
+            STOP_LOSS := entrada + StopEmPontos;
+            Stop_Offset := STOP_LOSS + StopOffset;
+            GAIN := (ENTRADA - AlvoEmPontos);
+            // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+            if (AskPrice <= Entrada) then
+              SellShortLimit(Entrada)
+            else if (low <= (Entrada + f_ProximidadeToqueTick * MinPriceIncrement)) then
+              // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+              SellShortStop(Entrada,Entrada);
+          end
+        ////======================================================================================================================================//
+        else if B_prox_PercentN_0561 and bMovimentoBaixa then
+          BEGIN
+            ENTRADA := F_PercentN_0561;
+            STOP_LOSS := ENTRADA - StopEmPontos;
+            Stop_Offset := STOP_LOSS - StopOffset;
+            GAIN := (ENTRADA + AlvoEmPontos);
+            if (BidPrice >= Entrada) then
+              BuyLimit(Entrada)
+            else if (high >= (Entrada - f_ProximidadeToqueTick * MinPriceIncrement)) then
+              // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+              BuyStop(Entrada,Entrada);
+          end;
+      end;
+  end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsSold then
+        BEGIN
+          { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+          if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS > SellPrice then
+                STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS < SellPrice then
+                STOP_LOSS := close + DistanciaPrecoPontos;
+            end;
+          //==> quantos ticks o preço andou
+          ////======================================================================================================================================//
+          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought then
+        BEGIN
+          { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
+          if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS < BuyPrice then
+                STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS > BuyPrice then
+                STOP_LOSS := Close - DistanciaPrecoPontos;
+            end;
+          ////======================================================================================================================================//
+          //==> quantos ticks o preço andou
+          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+            end;
+        end;
+      if Not HasPosition then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    BEGIN
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop(STOP_LOSS,STOP_LOSS + stopOffset);
+      IF (high > STOP_LOSS) THEN
+        BuyToCoverAtMarket;
+    END;
+  ////======================================================================================================================================//
+  IF IsBought then
+    begin
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,STOP_LOSS - stopOffset);
+      IF (LOW < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  ////======================================================================================================================================//
+  if IsBought and Not JaContouOperacao THEN
+    // TRAINLING STOP DE VENDA
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  if IsSold and Not JaContouOperacao THEN
+    // TRAINLING STOP DE VENDA
+    begin
+      { contabiliza a abertura da posição}
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+    end;
+  ////======================================================================================================================================//
+  ////======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  if Not IsBought and Not isSold and JaContouOperacao then
+    JaContouOperacao := false;
+  //=========================================================================================================================================================//
+end;

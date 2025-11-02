@@ -1,0 +1,451 @@
+CONST
+  DAYTRADE       = True;
+  HORAENTRADA    = 901;
+  HORASAIDA      = 1710;
+  HORAFECHAMENTO = 1730;
+  COMPRA_BOLA_N2 = 1;
+  VENDA_BOLA_N2  = - 1;
+  COMPRA_BOLA_N1 = 2;
+  VENDA_BOLA_N1  = - 2;
+  COMPRA_BOLA    = 3;
+  VENDA_BOLA     = - 3;
+  COMPRA_BOLA_P1 = 4;
+  VENDA_BOLA_P1  = - 4;
+  COMPRA_BOLA_P2 = 5;
+  VENDA_BOLA_P2  = - 5;
+  //=======================/
+INPUT
+  // bGestaoDeRiscoPelaEstrategia(true);
+  ModuloAutomacao(true);
+  StopEmPontos(150);
+  StopOffset(75);
+  AlvoEmPontos(600);
+  BreakevenEmPontos(400);
+  DistanciaEntradaPontos(25);
+  TraillingStopTrigger(400);
+  DistanciaPrecoPontos(100);
+  DistUltPreco(100);
+  FrequenciaAjuste(50);
+  ContraEstrategia(false);
+VAR
+  f_Numero_Bola                                                       : float;
+  fBolaP1,fBolaP2,fBolaP3,fBolaP4                                     : float;
+  fBolaN1,fBolaN2,fBolaN3,fBolaN4                                     : float;
+  STOP_LOSS,ENTRADA,GAIN,Stop_Offset                                  : FLOAT;
+  B_Prox_C_Bola,B_prox_V_Bola                                         : Boolean;
+  B_Prox_V_BolaN1,B_Prox_V_BolaN2                                     : Boolean;
+  B_Prox_V_BolaN3,B_Prox_V_BolaN4                                     : Boolean;
+  B_prox_V_BolaP1,B_prox_V_BolaP2                                     : Boolean;
+  B_prox_V_BolaP3,B_prox_V_BolaP4                                     : boolean;
+  B_Prox_C_BolaN1,B_Prox_C_BolaN2                                     : Boolean;
+  B_Prox_C_BolaN3,B_Prox_C_BolaN4                                     : Boolean;
+  B_prox_C_BolaP1,B_prox_C_BolaP2                                     : Boolean;
+  B_prox_C_BolaP3,B_prox_C_BolaP4                                     : boolean;
+  F_ProximidadeToqueTick                                              : float;
+  TrailingStopAtivado                                                 : boolean;
+  FloorTraillingStop                                                  : float;
+  BreakevenAtivado                                                    : boolean;
+  iDataAtual                                                          : integer;
+  bCompraBola,bCompraBolaP1,bCompraBolaP2,bCompraBolaN1,bCompraBolaN2 : boolean;
+  bVendaBola,bVendaBolaP1,bVendaBolaP2,bVendaBolaN1,bVendaBolaN2      : boolean;
+  iOperacao                                                           : integer;
+  iNroCandlesOrdem,iEntradaStop                                       : integer;
+  iBarControleStop                                                    : integer;
+begin
+  // Verificar se é um novo dia.
+  if (Date > date[1]) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      // iDataAtual := Date;
+      B_Prox_V_Bola := false;
+      B_Prox_C_Bola := false;
+      B_Prox_v_BolaP2 := false;
+      B_Prox_v_BolaP1 := false;
+      B_Prox_v_BolaN2 := false;
+      B_Prox_v_BolaN1 := false;
+      B_Prox_C_BolaP2 := false;
+      B_Prox_C_BolaP1 := false;
+      B_Prox_C_BolaN2 := false;
+      B_Prox_C_BolaN1 := false;
+      F_ProximidadeToqueTick := (10);
+      //========================//
+      f_Numero_Bola := ((floor(Opend(0) / 1000)) * 1000)+500;
+      fBolaP1 := f_Numero_Bola + 1000;
+      fBolaP2 := fBolaP1 + 1000;
+      fBolaN1 := f_Numero_Bola - 1000;
+      fBolaN2 := fBolaN1 - 1000;
+      // iOperacao irá controlar qual a entrada foi efetuada a fim de ser possivel desabilitar nova entrada no mesmo ponto antes de ocorrer uma nova habilitação desse ponto.
+      iOperacao := 0;
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 3;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+    end;
+  //=========================================================================================================================================================//
+  B_Prox_V_BolaP2 := (low <= (fBolaP2 + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (low >= fBolaP2);
+  B_Prox_V_BolaP1 := (low <= (fBolaP1 + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (low >= fBolaP1);
+  B_Prox_V_Bola := (low <= (f_Numero_Bola + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (low >= f_Numero_Bola);
+  B_Prox_V_BolaN1 := (low <= (fBolaN1 + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (low >= fBolaN1);
+  B_Prox_V_BolaN2 := (low <= (fBolaN2 + (F_ProximidadeToqueTick * MinPriceIncrement))) AND (low >= fBolaN2);
+  //=========================================================================================================================================================//
+  B_Prox_C_BolaP2 := (HIGH >= (FBolaP2 - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= FBolaP2);
+  B_Prox_C_BolaP1 := (HIGH >= (FBolaP1 - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= FBolaP1);
+  B_prox_C_Bola := (HIGH >= (f_Numero_Bola - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= f_Numero_Bola);
+  B_Prox_C_BolaN1 := (HIGH >= (FBolaN1 - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= FBolaN1);
+  B_Prox_C_BolaN2 := (HIGH >= (FBolaN2 - (F_ProximidadeToqueTick * MinPriceIncrement))) AND (HIGH <= FBolaN2);
+  //=========================================================================================================================================================//
+  // Analisar rompimentos de venda.
+  if Close > (fBolaP2 + DistanciaPrecoPontos) then
+    begin
+      // Todos os rompimentos bola de venda estão habilitados
+      bVendaBolaP2 := true;
+      bVendaBolaP1 := true;
+      bVendaBola := true;
+      bVendaBolaN1 := true;
+      bVendaBolaN2 := true;
+    end
+  else if Close > (fBolaP1 + DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de venda de P1 para baixo estão habilitados.
+      bVendaBolaP1 := true;
+      bVendaBola := true;
+      bVendaBolaN1 := true;
+      bVendaBolaN2 := true;
+    end
+  else if Close > (f_Numero_Bola + DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de venda de VendaBola para baixo estão habilitados.
+      bVendaBola := true;
+      bVendaBolaN1 := true;
+      bVendaBolaN2 := true;
+    end
+  else if Close > (fBolaN1 + DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de venda de N1 para baixo estão habilitados.
+      bVendaBolaN1 := true;
+      bVendaBolaN2 := true;
+    end
+  else if Close > (fBolaN2 + DistanciaPrecoPontos) then
+    // O rompimento bola de venda de N2 está habilitado.
+    bVendaBolaN2 := true;
+  // Analisar rompimentos de compra.
+  if Close < (fBolaN2 - DistanciaPrecoPontos) then
+    begin
+      // Todos os rompimentos bola de compra estão habilitados
+      bCompraBolaN2 := true;
+      bCompraBolaN1 := true;
+      bCompraBola := true;
+      bCompraBolaP1 := true;
+      bCompraBolaP2 := true;
+    end
+  else if Close < (fBolaN1 - DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de compra de N1 para cima estão habilitados.
+      bCompraBolaN1 := true;
+      bCompraBola := true;
+      bCompraBolaP1 := true;
+      bCompraBolaP2 := true;
+    end
+  else if Close < (f_Numero_Bola - DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de compra de CompraBola para cima estão habilitados.
+      bCompraBola := true;
+      bCompraBolaP1 := true;
+      bCompraBolaP2 := true;
+    end
+  else if Close < (fBolaP1 - DistanciaPrecoPontos) then
+    begin
+      // Os rompimentos bola de compra de P1 para cima estão habilitados.
+      bCompraBolaP1 := true;
+      bCompraBolaP2 := true;
+    end
+  else if Close < (fBolaP2 - DistanciaPrecoPontos) then
+    // O rompimento bola de compra de P2 está habilitado.
+    bCompraBolaP2 := true;
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  if (( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE))) then
+    BEGIN
+      // Só reinicializa a entrada se não estiver controlando ordens stop.
+      if iEntradaStop = 0 then
+        Entrada := 0;
+      IF B_Prox_V_Bola and bVendaBola THEN
+        begin
+          iOperacao := VENDA_BOLA;
+          ENTRADA := f_Numero_Bola;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_Bola and bCompraBola then
+        BEGIN
+          iOperacao := COMPRA_BOLA;
+          ENTRADA := f_Numero_Bola;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_Prox_V_BolaP1 and bVendaBolaP1 THEN
+        begin
+          iOperacao := VENDA_BOLA_P1;
+          ENTRADA := fBolaP1;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_BolaP1 and bCompraBolaP1 then
+        BEGIN
+          iOperacao := COMPRA_BOLA_P1;
+          ENTRADA := fBolaP1;
+          STOP_LOSS := Entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (Entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_Prox_V_BolaP2 and bVendaBolaP2 THEN
+        begin
+          iOperacao := VENDA_BOLA_P2;
+          ENTRADA := fBolaP2;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (ENTRADA - AlvoEmPontos);
+        end
+      else if B_prox_C_BolaP2 and bCompraBolaP2 then
+        BEGIN
+          iOperacao := COMPRA_BOLA_P2;
+          ENTRADA := fBolaP2;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END
+      ////======================================================================================================================================//
+      //=========================================================================================================================================================//
+      else IF B_Prox_V_BolaN1 and bVendaBolaN1 THEN
+        begin
+          iOperacao := VENDA_BOLA_N1;
+          ENTRADA := fBolaN1;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (entrada - AlvoEmPontos);
+        end
+      else if B_prox_C_BolaN1 and bCompraBolaN1 then
+        BEGIN
+          iOperacao := COMPRA_BOLA_N1;
+          ENTRADA := fBolaN1;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_Prox_V_BolaN2 and bVendaBolaN2 THEN
+        begin
+          iOperacao := VENDA_BOLA_N2;
+          ENTRADA := fBolaN2;
+          STOP_LOSS := entrada + StopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          GAIN := (entrada - AlvoEmPontos);
+        end
+      else if B_prox_C_BolaN2 and bCompraBolaN2 then
+        BEGIN
+          iOperacao := COMPRA_BOLA_N2;
+          ENTRADA := fBolaN2;
+          STOP_LOSS := entrada - StopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          GAIN := (entrada + AlvoEmPontos);
+        END;
+      if (Entrada <> 0) then
+        begin
+          // Verificar se é compra ou venda.
+          if ((iOperacao = COMPRA_BOLA_P2) OR (iOperacao = COMPRA_BOLA_P1) OR (iOperacao = COMPRA_BOLA) OR (iOperacao = COMPRA_BOLA_N1) OR (iOperacao = COMPRA_BOLA_N1)) OR (((iOperacao = VENDA_BOLA_P2) OR (iOperacao = VENDA_BOLA_P1) OR (iOperacao = VENDA_BOLA) OR (iOperacao = VENDA_BOLA_N1) OR (iOperacao = VENDA_BOLA_N1)) AND ContraEstrategia) then
+            begin
+              // Chegou em um rompimento comprador ou em um rompimento vendedor com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de compra, de acordo com o melhor preço de compra no book.
+              if (BidPrice >= Entrada) then
+                begin
+                  BuyLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (Entrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  BuyStop(Entrada,Entrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else 
+            begin
+              // Aqui é um rompimento vendedor ou um rompimento comprador com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+              if (AskPrice <= Entrada) then
+                begin
+                  SellShortLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (Entrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  SellShortStop(Entrada,Entrada);
+                  iEntradaStop := - 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+    end;
+  ////======================================================================================================================================//
+  if ModuloAutomacao then
+    BEGIN
+      IF IsSold THEN
+        // TRAILING STOP DE VENDA
+        BEGIN
+          // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+          if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + StopEmPontos)) then
+            Stop_Loss := SellPrice + StopEmPontos;
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS > SellPrice then
+                STOP_LOSS := SellPrice - DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS < SellPrice then
+                STOP_LOSS := close + DistanciaPrecoPontos;
+            end;
+          //==> quantos ticks o preço andou
+          ////======================================================================================================================================//
+          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
+            end;
+        END;
+      ////======================================================================================================================================//
+      IF IsBought THEN
+        BEGIN
+          // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+          if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - StopEmPontos)) then
+            Stop_Loss := BuyPrice - StopEmPontos;
+          // Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos
+          if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+            begin
+              BreakevenAtivado := true;
+              if STOP_LOSS < BuyPrice then
+                STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+            begin
+              TrailingStopAtivado := True;
+              if STOP_LOSS > BuyPrice then
+                STOP_LOSS := Close - DistanciaPrecoPontos;
+            end;
+          ////======================================================================================================================================//
+          //==> quantos ticks o preço andou
+          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
+          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+            begin
+              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+            end;
+          // Como está comprado, pode resetar a variável para entrada em novo pullback de compra (só habilitará nova entrada quando fizer nova máxima e não estiver comprado).
+          // bMovimentoAlta := false;
+        END;
+      if ( Not HasPosition) then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  IF IsSold THEN
+    begin
+      // Verificar qual o ponto de venda para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = VENDA_BOLA_N2) then
+        // Desabilitar rompimento bola de venda de N2.
+        bVendaBolaN2 := false
+      else if (iOperacao = VENDA_BOLA_N1) then
+        // Desabilitar rompimento bola de venda de N1.
+        bVendaBolaN1 := false
+      else if (iOperacao = VENDA_BOLA) then
+        // Desabilitar rompimento bola de venda do bola inicial.
+        bVendaBola := false
+      else if (iOperacao = VENDA_BOLA_P1) then
+        // Desabilitar rompimento bola de venda de P1.
+        bVendaBolaP1 := false
+      else if (iOperacao = VENDA_BOLA_P2) then
+        // Desabilitar rompimento bola de venda de P2.
+        bVendaBolaP2 := false;
+      BuyToCoverLimit(GAIN);
+      BuyToCoverStop(STOP_LOSS, StopOffset);
+      iEntradaStop := 0;
+      IF (high > STOP_LOSS) THEN
+        BuyToCoverAtMarket;
+    end;
+  //======================================================================================================================================//
+  IF IsBought then
+    begin
+      // Verificar qual o ponto de compra para desabilitar entrada antes de confirmar nova habilitação do mesmo ponto.
+      if (iOperacao = COMPRA_BOLA_N2) then
+        // Desabilitar rompimento bola de compra de N2.
+        bCompraBolaN2 := false
+      else if (iOperacao = COMPRA_BOLA_N1) then
+        // Desabilitar rompimento bola de compra de N1.
+        bCompraBolaN1 := false
+      else if (iOperacao = COMPRA_BOLA) then
+        // Desabilitar rompimento bola de compra do bola inicial.
+        bCompraBola := false
+      else if (iOperacao = COMPRA_BOLA_P1) then
+        // Desabilitar rompimento bola de compra de P1.
+        bCompraBolaP1 := false
+      else if (iOperacao = COMPRA_BOLA_P2) then
+        // Desabilitar rompimento bola de compra de P2.
+        bCompraBolaP2 := false;
+      SellToCoverLimit(Gain);
+      SellToCoverStop(STOP_LOSS,StopOffset);
+      iEntradaStop := 0;
+      IF (LOW < STOP_LOSS) or (close < STOP_LOSS) THEN
+        SellToCoverAtMarket;
+    end;
+  ////======================================================================================================================================//
+  ////== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+  if not HasPosition and (iEntradaStop <> 0) and (Entrada <> 0) then
+    begin
+      // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(Entrada,Entrada)
+              else 
+                SellShortStop(Entrada,Entrada);
+            end;
+        end
+      else 
+        iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+  //=========================================================================================================================================================//
+  Plot(fBolaP1);
+  Plot2(fBolaP2);
+  Plot3(f_Numero_Bola);
+  plot4(fBolaN1);
+  Plot5(fBolaN2); 
+  //=========================================================================================================================================================//
+end;

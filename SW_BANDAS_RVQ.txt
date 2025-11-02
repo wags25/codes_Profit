@@ -1,0 +1,596 @@
+// *************************************************************
+// *************************************************************
+// ********************* SW Bandas RVQ *************************
+// ********************* VERSAO 0.10 BETA **********************
+// *************************************************************
+// *************************************************************
+const
+  DAYTRADE         = TRUE;
+  HORAENTRADA      = 1001;
+  HORASAIDA        = 1640;
+  HORAFECHAMENTO   = 1641;
+  //============================//
+  BandaSup1_Venda  = - 1;
+  BandaSup2_Venda  = - 2;
+  BandaSup3_Venda  = - 3;
+  BandaSup4_Venda  = - 4;
+  BandaSup5_Venda  = - 5;
+  BandaInf1_Compra = 1;
+  BandaInf2_Compra = 2;
+  BandaInf3_Compra = 3;
+  BandaInf4_Compra = 4;
+  BandaInf5_Compra = 5;
+  //===========================//
+  Valor1           = 0.20;
+  Valor2           = 0.40;
+  Valor3           = 0.60;
+  Valor4           = 0.80;
+  Valor5           = 1.0;
+INPUT
+  ContraEstrategia(false);
+  ModuloAutomacao(false);
+  Range21Dias(false);
+  Gain(500.0);
+  StopLoss(150.0);
+  StopOffset(100.0);
+  OffsetEntradaStop(20.0);
+  AutoBreakeven(true);
+  BreakevenTrigger(200.0);
+  BreakevenDistEntrada(25);
+  TrailingStop(true);
+  TraillingStopTrigger(400.0);
+  DistPrecoPontosTrigger(100.0);
+  DistUltPrecoTrailing(100.0);
+  FrequenciaAjuste(50.0);
+  //=====================================//
+  DefesaAgressiva(false);
+  DefesaAgressivaPontos(2);
+  DefAgressivaGatilho1(17);
+  DefAgressivaGatilho2(27);
+  DefAgressivaGatilho3(37);
+  //Valor1(0.40);
+var
+  BandaSup1_vwap,BandaSup2_vwap,BandaSup3_vwap,BandaSup4_vwap,BandaSup5_vwap           : float;
+  BandaInf1_VWAP,BandaInf2_VWAP,BandaInf3_VWAP,BandaInf4_VWAP,BandaInf5_VWAP           : FLOAT;
+  F_ProximidadeToqueTick                                                               : float;
+  Stop_Loss,fGain,R,Stop_Offset                                                        : FLOAT;
+  B_prox_BandaSup1,B_prox_BandaSup2,B_prox_BandaSup3,B_prox_BandaSup4,B_prox_BandaSup5 : boolean;
+  B_prox_BandaInf1,B_prox_BandaInf2,B_prox_BandaInf3,B_prox_BandaInf4,B_prox_BandaInf5 : boolean;
+  TrailingStopAtivado                                                                  : boolean;
+  FloorTraillingStop                                                                   : float;
+  BreakevenAtivado                                                                     : boolean;
+  fAlvoEmPontos,fStopEmPontos,fEntrada                                                 : float;
+  iDataAtual                                                                           : integer;
+  nIndex,iPeriodo                                                                      : Integer;
+  iNroCandlesOrdem,iEntradaStop                                                        : integer;
+  iEntrada                                                                             : integer;
+  iBarControleStop                                                                     : integer;
+  RM                                                                                   : FLOAT;
+  fRM21_10Percent,fRM21_12Percent                                                      : float;
+  bJaContouOperacao                                                                    : boolean;
+  iOperacao                                                                            : integer;
+  bVendaBanda1,bVendaBanda2,bVendaBanda3,bVendaBanda4,bVendaBanda5                     : boolean;
+  bCompraBanda1,bCompraBanda2,bCompraBanda3,bCompraBanda4,bCompraBanda5                : boolean;
+  ////======================================================================================================================================//
+procedure ApregoaSaida(fPrecoStopLoss : float;
+fPrecoGain : float;fOffsetEmPontos : float);
+begin
+  if IsBought then
+    begin
+      IF (LOW < fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              SellToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          SellToCoverLimit(fPrecoGain);
+          SellToCoverStop(fPrecoStopLoss,fPrecoStopLoss - fOffsetEmPontos);
+        end;
+    end;
+  ////======================================================================================================================================//
+  if IsSold then
+    begin
+      if (HIGH > fPrecoStopLoss) then
+        begin
+          // Operação pânico! Precisa fechar a posição!
+          if (HasPendingOrders) then
+            begin
+              CancelPendingOrders;
+            end
+          else 
+            begin
+              BuyToCoverAtMarket;
+            end;
+        end
+      else 
+        begin
+          // Abrir posições de stop loss e gain.
+          BuyToCoverLimit(fPrecoGain);
+          BuyToCoverStop(fPrecoStopLoss,fPrecoStopLoss + fOffsetEmPontos);
+        end;
+    end;
+end;
+////======================================================================================================================================//
+begin
+  // Verificar se é um novo dia.
+  if (Date <> iDataAtual) then
+    begin
+      // Inicializar as variáveis de controle diárias.
+      iDataAtual := Date;
+      F_ProximidadeToqueTick := 6;
+      B_prox_BandaSup1 := false;
+      B_prox_BandaSup2 := false;
+      B_prox_BandaSup3 := false;
+      B_prox_BandaSup4 := false;
+      B_prox_BandaSup5 := false;
+      //===============================//
+      B_prox_BandaInf1 := false;
+      B_prox_BandaInf2 := false;
+      B_prox_BandaInf3 := false;
+      B_prox_BandaInf4 := false;
+      B_prox_BandaInf5 := false;
+      ////===============================
+      // Inicializa por quantos candles a ordem stop será mantida
+      iNroCandlesOrdem := 3;
+      // iEntradaStop irá controlar se a ordem apregoada é uma ordem stop, para ser repetida nos próximos iNroCandlesOrdem.
+      // iEntradaStop = 1  ==> ordem de compra stop
+      // iEntradaStop = -1 ==> ordem de venda stop
+      // iEntradaStop = 0  ==> sem entrada stop
+      iEntradaStop := 0;
+      bJaContouOperacao := false;
+      fEntrada := 0;
+      nIndex := 0;
+      R := 0;
+      RM := 0;
+      iPeriodo := (21);
+      //RANGE MEDIO DOS ULTIMOS 21 DIAS
+      for nIndex := 1 to (iPeriodo) Do
+        begin
+          R := R + (HighD(nIndex) - LowD(nIndex));
+        end;
+      RM := Round2fraction(R / iPeriodo);
+      // Calculo dos pontos referentes às porcentagens sobre o range medio 21 dias
+      fRM21_10Percent := Round2Fraction((10 / 100) * RM);
+      fRM21_12Percent := Round2Fraction((12 / 100) * RM);
+      // Calcular alvo e stop loss em pontos.
+      if (StopLoss = 0) then
+        begin
+          // Stop de 10% range medio 21 dias
+          fStopEmPontos := fRM21_10Percent;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Stop da porcentagem calculada sobre o range medio 21 dias
+            fStopEmPontos := Round2Fraction((StopLoss / 100) * RM)
+          else 
+            fStopEmPontos := StopLoss;
+        end;
+      if (Gain = 0) then
+        begin
+          // Valor que dificilmente será atingido no dia. Na prática vai sair no trailing stop.
+          fAlvoEmPontos := 500;
+        end
+      else 
+        begin
+          if Range21Dias then
+            // Valor será calculado sobre o valor em pontos do stop loss (assimetria risco/retorno).
+            fAlvoEmPontos := Gain * fStopEmPontos
+          else 
+            fAlvoEmPontos := Gain;
+        end;
+    end;
+  ////======================================================================================================================================//
+  //=====================================================================//
+  BandaSup1_vwap := (Round2Fraction(VWAP(1) * (Valor1 / 100) + VWAP(1)));
+  BandaSup2_vwap := (Round2Fraction(VWAP(1) * (Valor2 / 100) + VWAP(1)));
+  BandaSup3_vwap := (Round2Fraction(VWAP(1) * (Valor3 / 100) + VWAP(1)));
+  BandaSup4_vwap := (Round2Fraction(VWAP(1) * (Valor4 / 100) + VWAP(1)));
+  BandaSup5_vwap := (Round2Fraction(VWAP(1) * (Valor5 / 100) + VWAP(1)));
+  //=====================================================================//
+  BandaInf1_vwap := (Round2Fraction(VWAP(1) * ( - Valor1 / 100) + VWAP(1)));
+  BandaInf2_vwap := (Round2Fraction(VWAP(1) * ( - Valor2 / 100) + VWAP(1)));
+  BandaInf3_vwap := (Round2Fraction(VWAP(1) * ( - Valor3 / 100) + VWAP(1)));
+  BandaInf4_vwap := (Round2Fraction(VWAP(1) * ( - Valor4 / 100) + VWAP(1)));
+  BandaInf5_vwap := (Round2Fraction(VWAP(1) * ( - Valor5 / 100) + VWAP(1)));
+  ////======================================================================================================================================//
+  if (Close >= (BandaSup1_Vwap - fRM21_12Percent)) then
+    begin
+      //paintbar(clred);
+      bVendaBanda1 := True;
+      bVendaBanda2 := True;
+      bVendaBanda3 := True;
+      bVendaBanda4 := True;
+      bVendaBanda5 := True;
+    end
+  else if (close >= (BandaSup2_vwap - fRM21_12Percent)) then
+    begin
+      bVendaBanda2 := True;
+      bVendaBanda3 := True;
+      bVendaBanda4 := True;
+      bVendaBanda5 := True;
+    end
+  else if (close >= (BandaSup3_vwap - fRM21_12Percent)) then
+    begin
+      bVendaBanda3 := True;
+      bVendaBanda4 := True;
+      bVendaBanda5 := True;
+    end
+  else if (close >= (BandaSup4_vwap - fRM21_12Percent)) then
+    begin
+      bVendaBanda4 := True;
+      bVendaBanda5 := True;
+    end
+  else if (close >= (BandaSup5_vwap - fRM21_12Percent)) then
+    begin
+      bVendaBanda5 := True;
+    end;
+  //=========================================================================================================================================================//
+  if (close <= (BandaInf1_VWAP + fRM21_12Percent)) then
+    begin
+      // paintbar(clgreen);
+      bCompraBanda1 := true;
+      bCompraBanda2 := true;
+      bCompraBanda3 := true;
+      bCompraBanda4 := true;
+      bCompraBanda5 := true;
+    end
+  else if (close <= (BandaInf2_VWAP + fRM21_12Percent)) then
+    begin
+      bCompraBanda2 := true;
+      bCompraBanda3 := true;
+      bCompraBanda4 := true;
+      bCompraBanda5 := true;
+    end
+  else if (close <= (BandaInf3_VWAP + fRM21_12Percent)) then
+    begin
+      bCompraBanda3 := true;
+      bCompraBanda4 := true;
+      bCompraBanda5 := true;
+    end
+  else if (close <= (BandaInf4_VWAP + fRM21_12Percent)) then
+    begin
+      bCompraBanda4 := true;
+      bCompraBanda5 := true;
+    end
+  else if (close <= (BandaInf5_VWAP + fRM21_12Percent)) then
+    begin
+      bCompraBanda5 := true;
+    end;
+  ////======================================================================================================================================//
+  plot(BandaSup1_vwap);
+  plot2(BandaSup2_vwap);
+  plot3(BandaSup3_vwap);
+  plot4(BandaSup4_vwap);
+  plot5(BandaSup5_vwap);
+  //=====================================================================//
+  plot6(BandaInf1_vwap);
+  plot7(BandaInf2_vwap);
+  plot8(BandaInf3_vwap);
+  plot9(BandaInf4_vwap);
+  plot10(BandaInf5_vwap);
+  //=====================================================================//
+  //=========================================================================================================================================================//
+  // Parte responsável por detectar uma distancia para apregoar as ordens
+  B_prox_BandaSup1 := (high >= (BandaSup1_vwap - (F_ProximidadeToqueTick * MinPriceIncrement))) and (HIGH <= BandaSup1_vwap);
+  B_prox_BandaSup2 := (high >= (BandaSup2_vwap - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (HIGH <= BandaSup2_vwap);
+  B_prox_BandaSup3 := (high >= (BandaSup3_vwap - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (HIGH <= BandaSup3_vwap);
+  B_prox_BandaSup4 := (high >= (BandaSup4_vwap - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (HIGH <= BandaSup4_vwap);
+  B_prox_BandaSup4 := (high >= (BandaSup5_vwap - (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (HIGH <= BandaSup5_vwap);
+  //=========================================================================================================================================================//
+  B_prox_BandaInf1 := (low <= (BandaInf1_vwap + (F_ProximidadeToqueTick * MinPriceIncrement))) and (low >= BandaInf1_Compra);
+  B_prox_BandaInf2 := (low <= (BandaInf2_vwap + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (low >= BandaInf2_Compra);
+  B_prox_BandaInf3 := (low <= (BandaInf3_vwap + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (low >= BandaInf3_Compra);
+  B_prox_BandaInf4 := (low <= (BandaInf4_vwap + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (low >= BandaInf4_Compra);
+  B_prox_BandaInf4 := (low <= (BandaInf5_vwap + (F_ProximidadeToqueTick * MinPriceIncrement)));
+  // and (low >= BandaInf5_Compra);
+  //=========================================================================================================================================================//
+  //=========================================================================================================================================================//
+  IF ( not HasPosition) and ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) then
+    begin
+      // Só reinicializa a entrada se não estiver controlando ordens stop.
+      if iEntradaStop = 0 then
+        fEntrada := 0;
+      // Como não tem posição aberta, deve-se resetar a variável de controle da contagem de operações.
+      // bJaContouOperacao := false;
+      if B_prox_BandaSup1 and bVendaBanda1 THEN
+        begin
+          iOperacao := BandaSup1_Venda;
+          fENTRADA := BandaSup1_vwap;
+          STOP_LOSS := fentrada + fStopEmPontos;
+          Stop_Offset := STOP_LOSS + StopOffset;
+          fGAIN := (fENTRADA - fAlvoEmPontos);
+        end
+      else if B_prox_BandaInf1 and bCompraBanda1 then
+        begin
+          iOperacao := BandaInf1_Compra;
+          fENTRADA := BandaInf1_vwap;
+          STOP_LOSS := fentrada - fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA + fAlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_BandaSup2 and bVendaBanda2 THEN
+        begin
+          iOperacao := BandaSup2_Venda;
+          fENTRADA := BandaSup2_vwap;
+          STOP_LOSS := fEntrada + fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA - fAlvoEmPontos);
+        END
+      else if B_prox_BandaInf2 and bCompraBanda2 then
+        begin
+          iOperacao := BandaInf2_Compra;
+          fENTRADA := BandaInf2_vwap;
+          STOP_LOSS := fentrada - fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA + fAlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_BandaSup3 and bVendaBanda3 THEN
+        begin
+          iOperacao := BandaSup3_Venda;
+          fENTRADA := BandaSup3_vwap;
+          STOP_LOSS := fEntrada + fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA - fAlvoEmPontos);
+        END
+      else if B_prox_BandaInf3 and bCompraBanda3 then
+        begin
+          iOperacao := BandaInf3_Compra;
+          fENTRADA := BandaInf3_vwap;
+          STOP_LOSS := fentrada - fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA + fAlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_BandaSup4 and bVendaBanda4 THEN
+        BEGIN
+          iOperacao := BandaSup4_Venda;
+          fENTRADA := BandaSup4_vwap;
+          STOP_LOSS := fEntrada + fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA - fAlvoEmPontos);
+        END
+      else if B_prox_BandaInf4 and bCompraBanda4 then
+        begin
+          iOperacao := BandaInf4_Compra;
+          fENTRADA := BandaInf4_vwap;
+          STOP_LOSS := fentrada - fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA + fAlvoEmPontos);
+        END
+      //=========================================================================================================================================================//
+      else IF B_prox_BandaSup5 and bVendaBanda5 THEN
+        BEGIN
+          iOperacao := BandaSup5_Venda;
+          fENTRADA := BandaSup5_vwap;
+          STOP_LOSS := fEntrada + fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA - fAlvoEmPontos);
+        END
+      else if B_prox_BandaInf5 and bCompraBanda5 then
+        begin
+          iOperacao := BandaInf5_Compra;
+          fENTRADA := BandaInf5_vwap;
+          STOP_LOSS := fentrada - fStopEmPontos;
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := (fENTRADA + fAlvoEmPontos);
+        end;
+      ///=================================================================================================================================================================================================///
+      if (fEntrada <> 0) then
+        begin
+          if ((iOperacao = BandaInf1_Compra) or (iOperacao = BandaInf2_Compra) or (iOperacao = BandaInf3_Compra) or (iOperacao = BandaInf4_Compra) or (iOperacao = BandaInf5_Compra)) then
+            begin
+              if (BidPrice >= fEntrada) then
+                begin
+                  BuyLimit(fEntrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (fEntrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  BuyStop(fEntrada,fEntrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else if ((iOperacao = BandaSup1_Venda) or (iOperacao = BandaSup2_Venda) or (iOperacao = BandaSup3_Venda) or (iOperacao = BandaSup4_Venda) or (iOperacao = BandaSup5_Venda)) then
+            begin
+              // Aqui é um rompimento vendedor ou um rompimento comprador com a opção de estratégia contrária habilitada.
+              // Decidir se envia uma ordem limite ou stop de venda, de acordo com o melhor preço de venda no book.
+              if (AskPrice <= fEntrada) then
+                begin
+                  SellShortLimit(fEntrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (fEntrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  // Somente irá apregoar a ordem stop se a condição de proximidade da entrada for satisfeita.
+                  SellShortStop(fEntrada,fEntrada);
+                  iEntradaStop := - 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+    END;
+  ///=================================================================================================================================================================================================///
+  ///                                RESPONSAVEL PELO GERENCIAMENTO DO TRAILING STOP                                                                                                                  ///
+  ///=================================================================================================================================================================================================///
+  if (ModuloAutomacao) then
+    BEGIN
+      IF (IsBought) THEN
+        BEGIN
+          if (AutoBreakeven) then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - fStopEmPontos)) then
+                Stop_Loss := BuyPrice - fStopEmPontos;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+              if (close >= (BuyPrice + BreakevenTrigger)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (Stop_Loss < BuyPrice) then
+                    Stop_Loss := BuyPrice + BreakevenDistEntrada;
+                end;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (TrailingStop) then
+            begin
+              if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (Stop_Loss > BuyPrice) then
+                    Stop_Loss := close - DistPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                end;
+              ////======================================================================================================================================//
+              // Verificar defesa agressiva
+              if (DefesaAgressiva) then
+                begin
+                  if ((Close - BuyPrice) = DefAgressivaGatilho1) OR ((Close - BuyPrice) = DefAgressivaGatilho2) OR ((Close - BuyPrice) = DefAgressivaGatilho3) then
+                    begin
+                      // Ajustar o stop "gain" e o novo FloorTraillingStop;
+                      FloorTraillingStop := Close;
+                      Stop_Loss := FloorTraillingStop - DefesaAgressivaPontos;
+                    end;
+                end;
+            end;
+        END;
+      ///=================================================================================================================================================================================================///
+      IF (IsSold) THEN
+        BEGIN
+          if (AutoBreakeven) then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + fStopEmPontos)) then
+                Stop_Loss := SellPrice + fStopEmPontos;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+              if (close <= (SellPrice - BreakevenTrigger)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (Stop_Loss > SellPrice) then
+                    Stop_Loss := SellPrice - BreakevenDistEntrada;
+                end;
+            end;
+          ////======================================================================================================================================//
+          /// Parâmetros de trailing Stop
+          if (TrailingStop) then
+            begin
+              if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (Stop_Loss < SellPrice) then
+                    Stop_Loss := close + DistPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                end;
+              ////======================================================================================================================================//
+              // Verificar defesa agressiva
+              if (DefesaAgressiva) then
+                begin
+                  if ((SellPrice - Close) = DefAgressivaGatilho1) OR ((SellPrice - Close) = DefAgressivaGatilho2) OR ((SellPrice - Close) = DefAgressivaGatilho3) then
+                    begin
+                      // Ajustar o stop "gain" e o novo FloorTraillingStop;
+                      FloorTraillingStop := Close;
+                      Stop_Loss := FloorTraillingStop + DefesaAgressivaPontos;
+                    end;
+                end;
+            end;
+        END;
+      if ( Not HasPosition) then
+        begin
+          // Resetar as variáveis de controle do breakeven e do trailing stop.
+          BreakevenAtivado := false;
+          TrailingStopAtivado := false;
+        end;
+    END;
+  ////======================================================================================================================================//
+  if (IsBought) then
+    begin
+      if (iOperacao = BandaInf1_Compra) then
+        bCompraBanda1 := false
+      else if (iOperacao = BandaInf2_Compra) then
+        bCompraBanda2 := false
+      else if (iOperacao = BandaInf3_Compra) then
+        bCompraBanda3 := false
+      else if (iOperacao = BandaInf4_Compra) then
+        bCompraBanda4 := false
+      else if (iOperacao = BandaInf5_Compra) then
+        bCompraBanda5 := false;
+      fEntrada := 0;
+      iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  if IsSold then
+    begin
+      if (iOperacao = BandaSup1_Venda) then
+        bVendaBanda1 := false
+      else if (iOperacao = BandaSup2_Venda) then
+        bVendaBanda2 := false
+      else if (iOperacao = BandaSup3_Venda) then
+        bVendaBanda3 := false
+      else if (iOperacao = BandaSup4_Venda) then
+        bVendaBanda4 := false
+      else if (iOperacao = BandaSup5_Venda) then
+        bVendaBanda5 := false;
+      fEntrada := 0;
+      iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  ApregoaSaida(STOP_LOSS,fGAIN,stopOffset);
+  //======================================================================================================================================//
+  //== Controlar colocação de ordens stops após o candle de sinal                                                                       ==//
+  if not HasPosition and (iEntradaStop <> 0) and (fEntrada <> 0) then
+    begin
+      // Verificar se precisa colocar novamente a ordem stop (lembrando que por padrão do Profit as ordens Stop são automaticamente canceladas ao final do candle).
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(fEntrada,fEntrada)
+              else 
+                SellShortStop(fEntrada,fEntrada);
+            end;
+        end
+      else 
+        iEntradaStop := 0;
+    end;
+  //======================================================================================================================================//
+  //FECHAR TODAS POSIÇOES EM ABERTO
+  IF HasPosition and (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    begin
+      CLOSEPOSITION;
+    end;
+END;
+end;

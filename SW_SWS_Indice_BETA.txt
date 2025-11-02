@@ -380,8 +380,6 @@ begin
                 BEGIN
                   paintbar(rgb(0,0,205));
                   plottext(low,clwhite,0,10);
-                  paintbar(rgb(0,0,205));
-                  plottext(low,clwhite,0,10);
                   ENTRADA := Low - Respiro;
                   if ( not ContraEstrategia) then
                     begin
@@ -404,8 +402,6 @@ begin
                 begin
                   if (COND1CR OR COND2CR OR COND3CR OR COND4CR OR COND5CR OR COND6CR) THEN
                     begin
-                      paintbar(rgb(255,255,0));
-                      plottext(High,clwhite,0,10);
                       paintbar(rgb(255,255,0));
                       plottext(High,clwhite,0,10);
                       ENTRADA := High + Respiro;
@@ -435,8 +431,6 @@ begin
                 BEGIN
                   paintbar(rgb(128,0,0));
                   plottext(low,clwhite,0,10);
-                  paintbar(rgb(128,0,0));
-                  plottext(low,clwhite,0,10);
                   ENTRADA := Low - Respiro;
                   if ( not ContraEstrategia) then
                     begin
@@ -459,8 +453,6 @@ begin
                 begin
                   if (bCOND1CR OR bCOND2CR OR bCOND3CR OR bCOND4CR OR bCOND5CR OR bCOND6CR) THEN
                     begin
-                      paintbar(rgb(139,0,139));
-                      plottext(High,clwhite,0,10);
                       paintbar(rgb(139,0,139));
                       plottext(High,clwhite,0,10);
                       ENTRADA := High + Respiro;

@@ -111,7 +111,6 @@ BEGIN
       entrada := 0;
       iEntradaStop := 0;
       iNroCandlesOrdem := 2;
-      RangeIntervalo := 0;
     end;
   MetadeCorpo := (Open + Close) / 2;
   // CAPTURA A MAIOR MÁXIMA E MENOR MÍNIMA NO INTERVALO
@@ -126,20 +125,13 @@ BEGIN
   // Usa > ao invés de >= para garantir que passou do horário
   if (Time > HoraFim) and ( not IntervaloDefinido) then
     begin
-      // *** CALCULA O RANGE DO INTERVALO ***
-      RangeIntervalo := MaximaIntervalo - MinimaIntervalo;
-      // *** SÓ DEFINE INTERVALO SE RANGE FOR VÁLIDO ***
-      if (RangeIntervalo > 0) and (RangeIntervalo <= RangeMaximo) then
-        IntervaloDefinido := true;
-      // Se range > RangeMaximo, IntervaloDefinido fica false
-      // Assim não opera no dia!
+      IntervaloDefinido := true;
     end;
   // PLOTA AS LINHAS DA MÁXIMA E MÍNIMA (só se range for válido)
   if IntervaloDefinido then
     begin
       plot(MaximaIntervalo);
       plot2(MinimaIntervalo);
-     
     end;
   if MostrarNiveis and HasPosition then
     begin
@@ -147,10 +139,7 @@ BEGIN
       plot4(fGAIN);
     end;
   //=================================================================================================================================================================================================///
-  // VERIFICA SE METADE DO CORPO ROMPEU A MÁXIMA OU MÍNIMA
-  // VALIDAÇÃO DUPLA: IntervaloDefinido E RangeIntervalo <= RangeMaximo
-  if IntervaloDefinido { and (RangeIntervalo > 0)     and (RangeIntervalo <= RangeMaximo) }
-  and ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) then
+  if IntervaloDefinido and ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) then
     begin
       JaContouOperacao := false;
       if iEntradaStop = 0 then
@@ -345,7 +334,7 @@ BEGIN
     end;
   ////======================================================================================================================================//
   if (iBarControleStop <> CurrentBar) and HasPosition then
-    ApregoaSaida(STOP_LOSS,fGAIN,stopOffset);
+    ApregoaSaida(STOP_LOSS,fGAIN,stop_Offset);
   ////======================================================================================================================================//
   if (IsBought) and ( Not JaContouOperacao) THEN
     begin

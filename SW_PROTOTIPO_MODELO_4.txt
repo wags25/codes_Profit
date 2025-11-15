@@ -1,0 +1,386 @@
+const
+  DAYTRADE         = TRUE;
+  HORAENTRADA      = 0900;
+  HORASAIDA        = 1700;
+  HORAFECHAMENTO   = 1710;
+  OFFSET_ENTRADA   = 2;
+  CompraRompimento = 1;
+  VendaRompimento  = -1;
+  RespiroEntrada   = 5;
+
+INPUT
+  HoraInicio(930);
+  HoraFim(1000);
+  ModuloAutomacao(True);
+  Gain(2000.0);
+  StopLoss(250.0);
+  StopOffset(100.0);
+  OffsetEntradaStop(20.0);
+  AutoBreakeven(true);
+  BreakevenTrigger(200.0);
+  BreakevenDistEntrada(25.0);
+  TrailingStop(false);
+  TraillingStopTrigger(400.0);
+  DistPrecoPontosTrigger(150.0);
+  DistUltPrecoTrailing(100.0);
+  FrequenciaAjuste(50.0);
+  MostrarNiveis(true);
+  StopTecnico(True);
+  RespiroStopTecnico(5.0);
+
+VAR
+  MaximaIntervalo: float;
+  MinimaIntervalo: float;
+  IntervaloDefinido: boolean;
+  MetadeCorpo: float;
+  RompeuMaxima: boolean;
+  RompeuMinima: boolean;
+  DataAtual: integer;
+  JaRompeuMaxima: boolean;
+  JaRompeuMinima: boolean;
+  ENTRADA, STOP_LOSS, fGAIN, Respiro, Stop_Offset: FLOAT;
+  TrailingStopAtivado: boolean;
+  FloorTraillingStop: float;
+  BreakevenAtivado: boolean;
+  PrecoStopOffset: float;
+  bJaContouOperacao: boolean;
+  bIniciaContagemEntreOperacoes: boolean;
+  fStopLossInteligenteValor: float;
+  fAlvoEmPontos, fStopEmPontos: float;
+  bStopLossAjustado: boolean;
+  JaContouOperacao: boolean;
+  QtdeOperacoesNoDia: integer;
+  ioperacao, iEntradaStop: integer;
+  iBarControleStop: integer;
+  iPeriodo: Integer;
+  iEntrada: integer;
+  iNroCandlesOrdem: integer;
+  F_ProximidadeToqueTick: Float;
+  DistanciaStopOriginal: float;
+
+////======================================================================================================================================//
+procedure ApregoaSaida(fPrecoStopLoss: float; fPrecoGain: float; fOffsetEmPontos: float);
+begin
+  if IsBought then
+    begin
+      IF (LOW < fPrecoStopLoss - fOffsetEmPontos) then
+        begin
+          if (HasPendingOrders) then
+            CancelPendingOrders
+          else
+            SellToCoverAtMarket;
+        end
+      else
+        begin
+          SellToCoverLimit(fPrecoGain);
+          SellToCoverStop(fPrecoStopLoss, fPrecoStopLoss - fOffsetEmPontos);
+        end;
+    end;
+
+  if IsSold then
+    begin
+      if (HIGH > fPrecoStopLoss + fOffsetEmPontos) then
+        begin
+          if (HasPendingOrders) then
+            CancelPendingOrders
+          else
+            BuyToCoverAtMarket;
+        end
+      else
+        begin
+          BuyToCoverLimit(fPrecoGain);
+          BuyToCoverStop(fPrecoStopLoss, fPrecoStopLoss + fOffsetEmPontos);
+        end;
+    end;
+end;
+
+////======================================================================================================================================//
+BEGIN
+  fAlvoEmPontos := Gain;
+
+  if Date <> DataAtual then
+    begin
+      DataAtual := Date;
+      MaximaIntervalo := 0;
+      MinimaIntervalo := 999999;
+      IntervaloDefinido := false;
+      JaRompeuMaxima := false;
+      JaRompeuMinima := false;
+      bIniciaContagemEntreOperacoes := false;
+      bJaContouOperacao := false;
+      Respiro := RespiroEntrada * MinPriceIncrement;
+      QtdeOperacoesNoDia := 0;
+      F_ProximidadeToqueTick := 6;
+      entrada := 0;
+      iEntradaStop := 0;
+      iNroCandlesOrdem := 2;
+    end;
+
+  MetadeCorpo := (Open + Close) / 2;
+
+  // CAPTURA A MAIOR MÁXIMA E MENOR MÍNIMA NO INTERVALO
+  if (Time >= HoraInicio) and (Time < HoraFim) then
+    begin
+      if High > MaximaIntervalo then
+        MaximaIntervalo := High;
+      
+      if Low < MinimaIntervalo then
+        MinimaIntervalo := Low;
+    end;
+
+  // Marca que o intervalo foi definido após o horário final
+  if (Time >= HoraFim) and (not IntervaloDefinido) then
+    IntervaloDefinido := true;
+
+  // PLOTA AS LINHAS DA MÁXIMA E MÍNIMA
+  if IntervaloDefinido then
+    begin
+      plot(MaximaIntervalo);
+      plot2(MinimaIntervalo);
+    end;
+
+  if MostrarNiveis and HasPosition then
+    begin
+      plot3(STOP_LOSS);
+      plot4(fGAIN);
+    end;
+
+  //=================================================================================================================================================================================================///
+  // VERIFICA SE METADE DO CORPO ROMPEU A MÁXIMA OU MÍNIMA
+  if IntervaloDefinido and (Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) then
+    begin
+      JaContouOperacao := false;
+      
+      if iEntradaStop = 0 then
+        Entrada := 0;
+
+      // *** ROMPIMENTO DA MÁXIMA - COMPRA ***
+      if (MetadeCorpo > MaximaIntervalo) and (not JaRompeuMaxima) then
+        begin
+          RompeuMaxima := true;
+          JaRompeuMaxima := true;
+          PaintBar(clLime);
+          
+          Entrada := high + respiro;
+          ioperacao := CompraRompimento;
+          
+          // DEFINE O TIPO DE STOP
+          if StopTecnico then
+            begin
+              // STOP TÉCNICO: Na mínima do intervalo
+              STOP_LOSS := MinimaIntervalo - RespiroStopTecnico;
+              DistanciaStopOriginal := Entrada - STOP_LOSS;
+            end
+          else
+            begin
+              // STOP FIXO: Em pontos
+              fStopEmPontos := StopLoss;
+              STOP_LOSS := Entrada - fStopEmPontos;
+              DistanciaStopOriginal := fStopEmPontos;
+            end;
+          
+          Stop_Offset := STOP_LOSS - StopOffset;
+          fGAIN := ENTRADA + fAlvoEmPontos;
+        end
+      // *** ROMPIMENTO DA MÍNIMA - VENDA ***
+      else if (MetadeCorpo < MinimaIntervalo) and (not JaRompeuMinima) then
+        begin
+          RompeuMinima := true;
+          JaRompeuMinima := true;
+          PaintBar(clRed);
+          
+          Entrada := low - respiro;
+          ioperacao := VendaRompimento;
+          
+          // DEFINE O TIPO DE STOP
+          if StopTecnico then
+            begin
+              // STOP TÉCNICO: Na máxima do intervalo
+              STOP_LOSS := MaximaIntervalo + RespiroStopTecnico;
+              DistanciaStopOriginal := STOP_LOSS - Entrada;
+            end
+          else
+            begin
+              // STOP FIXO: Em pontos
+              fStopEmPontos := StopLoss;
+              STOP_LOSS := Entrada + fStopEmPontos;
+              DistanciaStopOriginal := fStopEmPontos;
+            end;
+          
+          Stop_Offset := STOP_LOSS + StopOffset;
+          fGAIN := ENTRADA - fAlvoEmPontos;
+        end;
+
+      //=================================================================================================================================================================================================///
+      if (Entrada <> 0) then
+        begin
+          if (iOperacao = compraRompimento) then
+            begin
+              if (BidPrice >= Entrada) then
+                begin
+                  BuyLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (high >= (Entrada - F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  BuyStop(Entrada, Entrada);
+                  iEntradaStop := 1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end
+          else
+            begin
+              if (AskPrice <= Entrada) then
+                begin
+                  SellShortLimit(Entrada);
+                  iEntradaStop := 0;
+                end
+              else if (low <= (Entrada + F_ProximidadeToqueTick * MinPriceIncrement)) then
+                begin
+                  SellShortStop(Entrada, Entrada);
+                  iEntradaStop := -1;
+                  iBarControleStop := CurrentBar;
+                end;
+            end;
+        end;
+    end;
+
+  ///=================================================================================================================================================================================================///
+  ///                                RESPONSAVEL PELO GERENCIAMENTO DO TRAILING STOP                                                                                                                  ///
+  ///=================================================================================================================================================================================================///
+  if (ModuloAutomacao) and HasPosition then
+    BEGIN
+      IF (IsBought) THEN
+        begin
+          if (AutoBreakeven) then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - DistanciaStopOriginal)) AND (not bStopLossAjustado) then
+                begin
+                  Stop_Loss := BuyPrice - DistanciaStopOriginal;
+                end;
+              
+              bStopLossAjustado := true;
+              
+              // Breakeven
+              if (close >= (BuyPrice + BreakevenTrigger)) and (not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (Stop_Loss < BuyPrice) then
+                    Stop_Loss := BuyPrice + BreakevenDistEntrada;
+                end;
+            end;
+
+          // Trailing Stop
+          if (TrailingStop) then
+            begin
+              if (close >= (BuyPrice + TraillingStopTrigger)) and (not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (Stop_Loss > BuyPrice) then
+                    Stop_Loss := close - DistPrecoPontosTrigger;
+                end;
+
+              FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                end;
+            end;
+        end;
+
+      IF (IsSold) THEN
+        BEGIN
+          if (AutoBreakeven) then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + DistanciaStopOriginal)) AND (not bStopLossAjustado) then
+                begin
+                  Stop_Loss := SellPrice + DistanciaStopOriginal;
+                end;
+              
+              bStopLossAjustado := true;
+              
+              // Breakeven
+              if (close <= (SellPrice - BreakevenTrigger)) and (not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (Stop_Loss > SellPrice) then
+                    Stop_Loss := SellPrice - BreakevenDistEntrada;
+                end;
+            end;
+
+          // Trailing Stop
+          if (TrailingStop) then
+            begin
+              if (close <= (SellPrice - TraillingStopTrigger)) and (not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (Stop_Loss < SellPrice) then
+                    Stop_Loss := close + DistPrecoPontosTrigger;
+                end;
+
+              FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                end;
+            end;
+        end;
+    END;
+
+  // Resetar variáveis quando não tem posição
+  if (Not HasPosition) then
+    begin
+      BreakevenAtivado := false;
+      TrailingStopAtivado := false;
+      fStopLossInteligenteValor := 0;
+      bStopLossAjustado := false;
+      RompeuMinima := false;
+      RompeuMaxima := false;
+    end;
+
+  ////======================================================================================================================================//
+  if (iBarControleStop <> CurrentBar) and HasPosition then
+    ApregoaSaida(STOP_LOSS, fGAIN, stopOffset);
+
+  ////======================================================================================================================================//
+  if (IsBought) and (Not JaContouOperacao) THEN
+    begin
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+      entrada := 0;
+    end;
+
+  if (IsSold) and (Not JaContouOperacao) THEN
+    begin
+      QtdeOperacoesNoDia := QtdeOperacoesNoDia + 1;
+      JaContouOperacao := true;
+      entrada := 0;
+    end;
+
+  ////======================================================================================================================================//
+  if (not HasPosition) and (iEntradaStop <> 0) and (Entrada <> 0) then
+    begin
+      if ((CurrentBar <= (iBarControleStop + iNroCandlesOrdem))) then
+        begin
+          if (CurrentBar > iBarControleStop) then
+            begin
+              if iEntradaStop > 0 then
+                BuyStop(Entrada, Entrada)
+              else
+                SellShortStop(Entrada, Entrada);
+            end;
+        end
+      else
+        begin
+          iEntradaStop := 0;
+          entrada := 0;
+        end;
+    end;
+
+  //======================================================================================================================================//
+  IF (DAYTRADE) AND (TIME >= HORAFECHAMENTO) THEN
+    CLOSEPOSITION;
+
+END;

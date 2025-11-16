@@ -9,12 +9,12 @@ Input
   stopOffset(10);
   AlvoEmPontos(35);
   AutoBreakeven(TRUE);
-  BreakevenEmPontos(10);
-  DistanciaEntradaPontos(0.5);
+  BreakevenTrigger(10.0);
+  BreakevenDistEntrada(0.5);
   TrailingStop(true);
-  TraillingStopTrigger(11);
-  DistanciaPrecoPontos(8);
-  DistUltPreco(8);
+  TraillingStopTrigger(20);
+  DistPrecoPontosTrigger(8.0);
+  DistUltPrecoTrailing(8.0);
   FrequenciaAjuste(3);
   PeriodoMedia(30);
   QtdeMaxOperacoesNoDia(1);
@@ -23,12 +23,14 @@ Var
   STOP_LOSS,ENTRADA,GAIN,Stop_Offset : FLOAT;
   F_ProximidadeToqueTick             : float;
   FloorTraillingStop                 : float;
+  fAlvoEmPontos,fStopEmPontos        : float;
   bTendenciaAlta,bTendenciaBaixa     : boolean;
   bPullbackVenda,bPullbackCompra     : boolean;
   bJaContouOperacao                  : boolean;
   bIniciaContagemEntreOperacoes      : boolean;
   TrailingStopAtivado                : boolean;
   BreakevenAtivado                   : boolean;
+  bStopLossAjustado                  : boolean;
   iBarControleStop                   : integer;
   iDataAtual                         : integer;
   QtdeOperacoesNoDia                 : integer;
@@ -115,7 +117,7 @@ begin
   //===============================================================================================================================//
   if ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) then
     begin
-     bJaContouOperacao := false;
+      bJaContouOperacao := false;
       if bPullbackCompra = true THEN
         BEGIN
           paintbar(cllime);
@@ -144,56 +146,28 @@ begin
         END;
     end;
   ////======================================================================================================================================//
-  if ModuloAutomacao then
+  ///=================================================================================================================================================================================================///
+  ///                                RESPONSAVEL PELO GERENCIAMENTO DO TRAILING STOP                                                                                                                  ///
+  ///=================================================================================================================================================================================================///
+  ////======================================================================================================================================//
+  if (ModuloAutomacao) then
     BEGIN
-      IF IsSold then
-        BEGIN
-          if (AutoBreakeven) then
-            BEGIN
-              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
-              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + StopEmPontos)) then
-                Stop_Loss := SellPrice + StopEmPontos;
-              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
-              if (close <= (SellPrice - BreakevenEmPontos)) and ( not BreakevenAtivado) then
-                begin
-                  BreakevenAtivado := true;
-                  if STOP_LOSS > SellPrice then
-                    STOP_LOSS := SellPrice - DistanciaEntradaPontos;
-                end;
-            END;
-          ////======================================================================================================================================//
-          /// Parâmetros de trailing Stop
-          if (TrailingStop) then
-            begin
-              if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
-                begin
-                  TrailingStopAtivado := True;
-                  if STOP_LOSS < SellPrice then
-                    STOP_LOSS := close + DistanciaPrecoPontos;
-                end;
-            end;
-          //==> quantos ticks o preço andou
-          ////======================================================================================================================================//
-          FloorTraillingStop := SellPrice - floor((SellPrice - close) / (DistUltPreco)) * DistUltPreco;
-          if ((FloorTraillingStop + FrequenciaAjuste) <= STOP_LOSS) and (Close <= SellPrice - DistUltPreco) and TrailingStopAtivado then
-            begin
-              STOP_LOSS := FloorTraillingStop + FrequenciaAjuste;
-            end;
-        END;
-      ////======================================================================================================================================//
-      IF IsBought then
-        BEGIN
+      IF (IsBought) THEN
+        begin
           if (AutoBreakeven) then
             begin
               // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
-              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - StopEmPontos)) then
-                Stop_Loss := BuyPrice - StopEmPontos;
-              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da DistanciaEntradaPontos }
-              if (close >= (BuyPrice + BreakevenEmPontos)) and ( not BreakevenAtivado) then
+              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - fStopEmPontos)) AND ( not bStopLossAjustado) then
+                begin
+                  Stop_Loss := BuyPrice - (high - low);
+                end;
+              bStopLossAjustado := true;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+              if (close >= (BuyPrice + BreakevenTrigger)) and ( not BreakevenAtivado) then
                 begin
                   BreakevenAtivado := true;
-                  if STOP_LOSS < BuyPrice then
-                    STOP_LOSS := BuyPrice + DistanciaEntradaPontos;
+                  if (Stop_Loss < BuyPrice) then
+                    Stop_Loss := BuyPrice + BreakevenDistEntrada;
                 end;
             end;
           ////======================================================================================================================================//
@@ -203,24 +177,65 @@ begin
               if (close >= (BuyPrice + TraillingStopTrigger)) and ( not TrailingStopAtivado) then
                 begin
                   TrailingStopAtivado := True;
-                  if STOP_LOSS > BuyPrice then
-                    STOP_LOSS := Close - DistanciaPrecoPontos;
+                  if (Stop_Loss > BuyPrice) then
+                    Stop_Loss := close - DistPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop - DistUltPrecoTrailing) >= Stop_Loss) and (Close >= BuyPrice + FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop - DistUltPrecoTrailing;
+                end;
+            end;
+        end;
+      ////======================================================================================================================================//
+      IF (IsSold) THEN
+        BEGIN
+          if (AutoBreakeven) then
+            begin
+              // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
+              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + fStopEmPontos)) AND ( not bStopLossAjustado) then
+                begin
+                  Stop_Loss := SellPrice + (high - low);
+                end;
+              bStopLossAjustado := true;
+              { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
+              if (close <= (SellPrice - BreakevenTrigger)) and ( not BreakevenAtivado) then
+                begin
+                  BreakevenAtivado := true;
+                  if (Stop_Loss > SellPrice) then
+                    Stop_Loss := SellPrice - BreakevenDistEntrada;
                 end;
             end;
           ////======================================================================================================================================//
-          //==> quantos ticks o preço andou
-          FloorTraillingStop := BuyPrice + floor((close - BuyPrice) / (DistUltPreco)) * DistUltPreco;
-          if ((FloorTraillingStop - FrequenciaAjuste) >= STOP_LOSS) and (Close >= BuyPrice + DistUltPreco) and TrailingStopAtivado then
+          /// Parâmetros de trailing Stop
+          if (TrailingStop) then
             begin
-              STOP_LOSS := FloorTraillingStop - FrequenciaAjuste;
+              if (close <= (SellPrice - TraillingStopTrigger)) and ( not TrailingStopAtivado) then
+                begin
+                  TrailingStopAtivado := True;
+                  if (Stop_Loss < SellPrice) then
+                    Stop_Loss := close + DistPrecoPontosTrigger;
+                end;
+              ////======================================================================================================================================//
+              //==> quantos ticks o preço andou
+              FloorTraillingStop := SellPrice - floor((SellPrice - close) / (FrequenciaAjuste)) * FrequenciaAjuste;
+              if ((FloorTraillingStop + DistUltPrecoTrailing) <= Stop_Loss) and (Close <= SellPrice - FrequenciaAjuste) and TrailingStopAtivado then
+                begin
+                  Stop_Loss := FloorTraillingStop + DistUltPrecoTrailing;
+                end;
             end;
         end;
-      if Not HasPosition then
+      ////======================================================================================================================================//
+      if ( Not HasPosition) then
         begin
           // Resetar as variáveis de controle do breakeven e do trailing stop.
           BreakevenAtivado := false;
           TrailingStopAtivado := false;
+          bStopLossAjustado := false;
         end;
+      ////======================================================================================================================================//
     END;
   ////======================================================================================================================================//
   if (iBarControleStop <> CurrentBar) then

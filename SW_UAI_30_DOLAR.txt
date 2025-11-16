@@ -115,6 +115,7 @@ begin
   //===============================================================================================================================//
   if ( Not HasPosition) AND ((DAYTRADE AND (TIME >= HORAENTRADA) AND (TIME < HORASAIDA)) OR (DAYTRADE = FALSE)) and (QtdeOperacoesNoDia < QtdeMaxOperacoesNoDia) then
     begin
+     bJaContouOperacao := false;
       if bPullbackCompra = true THEN
         BEGIN
           paintbar(cllime);

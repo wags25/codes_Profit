@@ -1,8 +1,9 @@
 CONST
-  DAYTRADE       = true;
-  HORAENTRADA    = 0900;
-  HORASAIDA      = 1710;
-  HORAFECHAMENTO = 1730;
+  DAYTRADE           = true;
+  HORAENTRADA        = 0900;
+  HORASAIDA          = 1710;
+  HORAFECHAMENTO     = 1730;
+  RespiroStopTecnico = 5.0;
 Input
   ModuloAutomacao(True);
   StopEmPontos(7);
@@ -18,12 +19,14 @@ Input
   FrequenciaAjuste(3);
   PeriodoMedia(30);
   QtdeMaxOperacoesNoDia(1);
+  StopTecnico(false);
 Var
   fMedia_trend                       : float;
   STOP_LOSS,ENTRADA,GAIN,Stop_Offset : FLOAT;
   F_ProximidadeToqueTick             : float;
   FloorTraillingStop                 : float;
   fAlvoEmPontos,fStopEmPontos        : float;
+  DistanciaStopOriginal              : float;
   bTendenciaAlta,bTendenciaBaixa     : boolean;
   bPullbackVenda,bPullbackCompra     : boolean;
   bJaContouOperacao                  : boolean;
@@ -122,22 +125,55 @@ begin
         BEGIN
           paintbar(cllime);
           ENTRADA := fMedia_trend;
-          STOP_LOSS := entrada - StopEmPontos;
-          Stop_Offset := STOP_LOSS - StopOffset;
-          GAIN := ENTRADA + AlvoEmPontos;
+          // DEFINE O TIPO DE STOP
+          if StopTecnico then
+            begin
+              // STOP TÉCNICO: Na mínima do intervalo
+              STOP_LOSS := low - RespiroStopTecnico;
+              DistanciaStopOriginal := Entrada - STOP_LOSS;
+            end
+          else 
+            begin
+              // STOP FIXO: Em pontos
+              fStopEmPontos := StopEmPontos;
+              STOP_LOSS := Entrada - fStopEmPontos;
+              DistanciaStopOriginal := fStopEmPontos;
+            end;
+          // STOP_LOSS := entrada - StopEmPontos;
+          begin
+            Stop_Offset := STOP_LOSS - StopOffset;
+            GAIN := ENTRADA + AlvoEmPontos;
+          end;
           if (BidPrice >= ENTRADA) then
             BuyLimit(ENTRADA)
           else 
             BuyStop(ENTRADA,ENTRADA);
           //BuyLimit(ENTRADA);
         END
+      //===============================================================================================================================//
       else if bPullbackVenda = true THEN
         BEGIN
           paintbar(clred);
           ENTRADA := fMedia_trend;
-          STOP_LOSS := entrada + StopEmPontos;
-          Stop_Offset := STOP_LOSS + StopOffset;
-          GAIN := ENTRADA - AlvoEmPontos;
+          // DEFINE O TIPO DE STOP
+          if StopTecnico then
+            begin
+              // STOP TÉCNICO: Na máxima do intervalo
+              STOP_LOSS := high + RespiroStopTecnico;
+              DistanciaStopOriginal := STOP_LOSS - Entrada;
+            end
+          else 
+            begin
+              // STOP FIXO: Em pontos
+              fStopEmPontos := StopEmPontos;
+              STOP_LOSS := Entrada + fStopEmPontos;
+              DistanciaStopOriginal := fStopEmPontos;
+            end;
+          //STOP_LOSS := entrada + StopEmPontos;
+          begin
+            Stop_Offset := STOP_LOSS + StopOffset;
+            GAIN := ENTRADA - AlvoEmPontos;
+          end;
           if (AskPrice <= ENTRADA) then
             SellShortLimit(ENTRADA)
           else 
@@ -157,9 +193,9 @@ begin
           if (AutoBreakeven) then
             begin
               // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
-              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - fStopEmPontos)) AND ( not bStopLossAjustado) then
+              if (Stop_Loss < BuyPrice) AND (Stop_Loss <> (BuyPrice - DistanciaStopOriginal)) AND ( not bStopLossAjustado) then
                 begin
-                  Stop_Loss := BuyPrice - (high - low);
+                  Stop_Loss := BuyPrice - DistanciaStopOriginal;
                 end;
               bStopLossAjustado := true;
               { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }
@@ -195,9 +231,9 @@ begin
           if (AutoBreakeven) then
             begin
               // Ajustar valor do stop loss de acordo com o preço "de fato" de entrada na operação.
-              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + fStopEmPontos)) AND ( not bStopLossAjustado) then
+              if (Stop_Loss > SellPrice) AND (Stop_Loss <> (SellPrice + DistanciaStopOriginal)) AND ( not bStopLossAjustado) then
                 begin
-                  Stop_Loss := SellPrice + (high - low);
+                  Stop_Loss := SellPrice + DistanciaStopOriginal;
                 end;
               bStopLossAjustado := true;
               { Responsavel pelo breakeaven, quando fechar o candle o stop loss vai para o valor da BreakevenDistEntrada }

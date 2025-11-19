@@ -1,5 +1,5 @@
-{Este modelo teve melhores resultados no indice
-utilizando 6 min e 10 min 
+{Este modelo teve melhores resultados no WSPFUT
+utilizando O gráfico de 15 min E 10 MIN
 }
 
 
@@ -14,24 +14,24 @@ const
   RespiroEntrada     = 5;
   RespiroStopTecnico = 5.0;
 INPUT
-  HoraInicio(930);
-  HoraFim(959);
+  HoraInicio(1115);
+  HoraFim(1129);
   ModuloAutomacao(True);
-  Gain(2000.0);
-  StopLoss(250.0);
-  StopOffset(100.0);
-  OffsetEntradaStop(20.0);
+  Gain(30.0);
+  StopLoss(20.0);
+  StopOffset(10.0);
+  OffsetEntradaStop(2.0);
   AutoBreakeven(true);
-  BreakevenTrigger(200.0);
-  BreakevenDistEntrada(25.0);
-  TrailingStop(false);
-  TraillingStopTrigger(500.0);
-  DistPrecoPontosTrigger(150.0);
-  DistUltPrecoTrailing(100.0);
-  FrequenciaAjuste(50.0);
+  BreakevenTrigger(10.0);
+  BreakevenDistEntrada(1.0);
+  TrailingStop(TRUE);
+  TraillingStopTrigger(20.0);
+  DistPrecoPontosTrigger(8.0);
+  DistUltPrecoTrailing(8.0);
+  FrequenciaAjuste(3.0);
   MostrarNiveis(true);
-  StopTecnico(True);
-  RangeMaximo(700.0);
+  StopTecnico(true);
+  RangeMaximo(30.0);
 VAR
   MaximaIntervalo                             : float;
   MinimaIntervalo                             : float;
@@ -214,7 +214,7 @@ BEGIN
               STOP_LOSS := Entrada + fStopEmPontos;
               DistanciaStopOriginal := fStopEmPontos;
             end ;
-          
+         
             begin
               Stop_Offset := STOP_LOSS + StopOffset;
               fGAIN := ENTRADA - fAlvoEmPontos;

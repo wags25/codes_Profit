@@ -1,3 +1,8 @@
+{Este modelo teve melhores resultados no indice
+utilizando 6 min
+}
+
+
 const
   DAYTRADE           = TRUE;
   HORAENTRADA        = 0900;
@@ -10,7 +15,7 @@ const
   RespiroStopTecnico = 5.0;
 INPUT
   HoraInicio(930);
-  HoraFim(1000);
+  HoraFim(959);
   ModuloAutomacao(True);
   Gain(2000.0);
   StopLoss(250.0);
@@ -20,7 +25,7 @@ INPUT
   BreakevenTrigger(200.0);
   BreakevenDistEntrada(25.0);
   TrailingStop(false);
-  TraillingStopTrigger(400.0);
+  TraillingStopTrigger(500.0);
   DistPrecoPontosTrigger(150.0);
   DistUltPrecoTrailing(100.0);
   FrequenciaAjuste(50.0);
@@ -172,8 +177,8 @@ BEGIN
               fStopEmPontos := StopLoss;
               STOP_LOSS := Entrada - fStopEmPontos;
               DistanciaStopOriginal := fStopEmPontos;
-            end
-          else 
+            end ;
+          
             begin
               Stop_Offset := STOP_LOSS - StopOffset;
               fGAIN := ENTRADA + fAlvoEmPontos;
@@ -208,8 +213,8 @@ BEGIN
               fStopEmPontos := StopLoss;
               STOP_LOSS := Entrada + fStopEmPontos;
               DistanciaStopOriginal := fStopEmPontos;
-            end
-          else 
+            end ;
+          
             begin
               Stop_Offset := STOP_LOSS + StopOffset;
               fGAIN := ENTRADA - fAlvoEmPontos;
